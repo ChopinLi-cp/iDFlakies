@@ -40,4 +40,22 @@ public class OperationTime {
     public double elapsedSeconds() {
         return elapsedSeconds;
     }
+
+    //from ifixflakies
+    public OperationTime addTime(OperationTime otherTime) {
+        if (otherTime == null)
+            return this;
+        long earliestStart = (startTime < otherTime.startTime) ? startTime : otherTime.startTime;
+        long elapsedSeconds = (long) (elapsedSeconds() + otherTime.elapsedSeconds);
+        return new OperationTime(earliestStart, elapsedSeconds);
+    }
+
+    //from ifixflakies
+    public OperationTime mergeTime(OperationTime otherTime) {
+        if (otherTime == null)
+            return this;
+        long earliestStart = (startTime < otherTime.startTime) ? startTime : otherTime.startTime;
+        long latestEnd = (endTime < otherTime.endTime) ? otherTime.endTime: endTime;
+        return new OperationTime(earliestStart, latestEnd);
+    }
 }

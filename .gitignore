@@ -6,3 +6,4 @@ target/
 *.hi
 .idea/
 .idea/workspace.xml
+*.iml
