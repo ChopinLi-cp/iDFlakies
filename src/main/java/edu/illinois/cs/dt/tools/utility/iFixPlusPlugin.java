@@ -3,11 +3,13 @@ package edu.illinois.cs.dt.tools.utility;
 import com.google.gson.Gson;
 import com.reedoei.eunomia.io.files.FileUtil;
 import edu.illinois.cs.diaper.StateCapture;
+import edu.illinois.cs.diaper.agent.MainAgent;
 import edu.illinois.cs.dt.tools.minimizer.PolluterData;
 import edu.illinois.cs.dt.tools.runner.data.DependentTest;
 import edu.illinois.cs.dt.tools.runner.data.DependentTestList;
 import edu.illinois.cs.testrunner.configuration.Configuration;
 import edu.illinois.cs.testrunner.data.results.TestRunResult;
+import edu.illinois.cs.testrunner.execution.JUnitTestExecutor;
 import edu.illinois.cs.testrunner.mavenplugin.TestPlugin;
 import edu.illinois.cs.testrunner.mavenplugin.TestPluginPlugin;
 import edu.illinois.cs.testrunner.runner.Runner;
@@ -34,8 +36,9 @@ public class iFixPlusPlugin extends TestPlugin {
     private String dtjavapPath = "";
     private String xmlFold;
     private String module;
-    //private String output;
+    private String output;
     private String slug;
+    private String tmpfile;
     //private String lognum;
     @Override
     public void execute(final MavenProject mavenProject) {
@@ -44,9 +47,10 @@ public class iFixPlusPlugin extends TestPlugin {
         replayPath = Paths.get(Configuration.config().getProperty("replay.path"));
         replayPath2 = Paths.get(Configuration.config().getProperty("replay.path2"));
         dtname= Configuration.config().getProperty("replay.dtname");
-        //output= Configuration.config().getProperty("replay.output");
+        output= Configuration.config().getProperty("replay.output");
         slug= Configuration.config().getProperty("replay.slug");
         xmlFold = Configuration.config().getProperty("replay.xmlFold");
+        tmpfile = Configuration.config().getProperty("replay.tmpfile");
         module = Configuration.config().getProperty("replay.module");
         //lognum = Configuration.config().getProperty("replay.lognum");
 
@@ -58,42 +62,86 @@ public class iFixPlusPlugin extends TestPlugin {
             System.out.println("module: " + module);
 
             try {
+
                 final Runner runner = runnerOption.get(); // safe because we checked above
                 System.out.println("tests!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" +
                         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
-                System.out.println("begin passing order state capturing!!");
-                //boolean passOrder = true;
+                //phase 1
+                Try<TestRunResult> phase1Result = null;
                 try{
-                    //final Try<TestRunResult> PassRunResult =
-                    runner.runList(testPassOrder());
+                    System.out.println("phase 1!!!");
+                    write2tmp("1");
+
+                    edu.illinois.cs.testrunner.configuration.Configuration.config().properties().
+                            setProperty("testplugin.runner.idempotent.num.runs", "2");
+                    phase1Result = runner.runList(doubleVictim());
+                    //runner.runList(doubleVictim());
+                    //System.out.println()
+                    System.out.println(phase1Result.get().results().get(dtname+":1").result());
+                    /*String statistics= slug + "," + dtname + "," +
+                            PassRunResult.get().results().get(dtname+":1").result().toString() + "\n";
+                    Files.write(Paths.get(output),
+                            statistics.getBytes(),
+                            StandardOpenOption.APPEND);*/
+                    edu.illinois.cs.testrunner.configuration.Configuration.config().properties().
+                            setProperty("testplugin.runner.idempotent.num.runs", "-1");
                 }
                 catch(Exception e) {
-                    System.out.println("error in running passing order!");
+                    System.out.println("error in phase 1: " + e);
                 }
                 System.out.println("finished passing order state capturing!!");
-                System.out.println("passOrder: " + testPassOrder());
 
-                System.out.println("begin failing order state capturing!!");
+                if(phase1Result.get().results().get(dtname+":1").result().toString().equals("PASS")) {
+                    System.out.println("enter phase 2!!!");
+                    write2tmp("2");
+                    Files.write(Paths.get(output),
+                            "doublevictim,".getBytes(),
+                            StandardOpenOption.APPEND);
+                    try {
+                        runner.runList(doubleVictim());
+                    }
+                    catch (Exception e){
+                        System.out.println("error in phase 1: " + e);
+                    }
+                }
+                else {
+                    System.out.println("enter phase 3!!!");
+                    write2tmp("3");
+                    Files.write(Paths.get(output),
+                            "passorder,".getBytes(),
+                            StandardOpenOption.APPEND);
+                    try{
+                        runner.runList(testPassOrder());
+                    }
+                    catch(Exception e) {
+                        System.out.println("error in running passing order!");
+                    }
+                    System.out.println("finished passing order state capturing!!");
+                    System.out.println("passOrder: " + testPassOrder());
+                }
+
+                System.out.println("enter phase 4!!");
+                write2tmp("4");
 
                 if(testFailOrder()==null) {
                     System.out.println("Something wrong in reading the failing order file!!");
                     return;
                 }
-
                 try {
-                    final Try<TestRunResult> FailRunResult =
-                            runner.runList(testFailOrder());
+                    runner.runList(testFailOrder());
                 }
                 catch(Exception e) {
-                    System.out.println("error in failing passing order! " + e);
+                    System.out.println("error in phase 4!! " + e);
                 }
 
-                System.out.println("finished failing order state capturing!!");
+                System.out.println("finish phase 4!!");
                 System.out.println("FailOrder: " + testFailOrder());
 
-                xmlFileNum = new File(xmlFold).listFiles().length;
+                System.out.println("enter phase 5!!!");
+                write2tmp("5");
 
+                xmlFileNum = new File(xmlFold).listFiles().length;
                 System.out.println("xmlFileNum: " + xmlFileNum);
                 if(xmlFileNum == 2) {
                     System.out.println("begining diff!!!!!!!!!!");
@@ -106,9 +154,6 @@ public class iFixPlusPlugin extends TestPlugin {
                     }
                 }
                 else {
-                    /*String statistics = slug + "," + dtname + ",0,0,0,0\n";
-                    Files.write(Paths.get(output), statistics.getBytes(),
-                            StandardOpenOption.APPEND);*/
                     System.out.println("cannot do diff, the number of xml files is not 2!!");
                 }
             } catch (Exception e) {
@@ -117,6 +162,18 @@ public class iFixPlusPlugin extends TestPlugin {
         } else {
             TestPluginPlugin.mojo().getLog().info("Module is not using a supported test framework (probably not JUnit).");
         }
+    }
+
+    private void write2tmp(String s) throws FileNotFoundException, UnsupportedEncodingException {
+        PrintWriter writer = new PrintWriter(tmpfile, "UTF-8");
+        writer.print(s);
+        writer.close();
+    }
+
+    private List<String> doubleVictim() {
+        List<String> partialOrder = new ArrayList<>();
+        partialOrder.add(dtname);
+        return partialOrder;
     }
 
     private List<String> testPassOrder() throws IOException {
