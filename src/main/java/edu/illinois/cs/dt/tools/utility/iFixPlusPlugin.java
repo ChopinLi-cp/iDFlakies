@@ -39,6 +39,8 @@ public class iFixPlusPlugin extends TestPlugin {
     private String output;
     private String slug;
     private String tmpfile;
+    private String diffFieldsFold;
+    private String reflectionFold;
     //private String lognum;
     @Override
     public void execute(final MavenProject mavenProject) {
@@ -52,6 +54,9 @@ public class iFixPlusPlugin extends TestPlugin {
         xmlFold = Configuration.config().getProperty("replay.xmlFold");
         tmpfile = Configuration.config().getProperty("replay.tmpfile");
         module = Configuration.config().getProperty("replay.module");
+        diffFieldsFold = Configuration.config().getProperty("replay.diffFieldsFold");
+        reflectionFold = Configuration.config().getProperty("replay.reflectionFold");
+
         //lognum = Configuration.config().getProperty("replay.lognum");
 
         int xmlFileNum = new File(xmlFold).listFiles().length;
@@ -62,12 +67,11 @@ public class iFixPlusPlugin extends TestPlugin {
             System.out.println("module: " + module);
 
             try {
-
                 final Runner runner = runnerOption.get(); // safe because we checked above
                 System.out.println("tests!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" +
                         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
-                //phase 1
+                 //phase 1
                 Try<TestRunResult> phase1Result = null;
                 try{
                     System.out.println("phase 1!!!");
@@ -75,22 +79,16 @@ public class iFixPlusPlugin extends TestPlugin {
 
                     edu.illinois.cs.testrunner.configuration.Configuration.config().properties().
                             setProperty("testplugin.runner.idempotent.num.runs", "2");
-                    phase1Result = runner.runList(doubleVictim());
-                    //runner.runList(doubleVictim());
-                    //System.out.println()
+                    phase1Result = runner.runList(victim());
                     System.out.println(phase1Result.get().results().get(dtname+":1").result());
-                    /*String statistics= slug + "," + dtname + "," +
-                            PassRunResult.get().results().get(dtname+":1").result().toString() + "\n";
-                    Files.write(Paths.get(output),
-                            statistics.getBytes(),
-                            StandardOpenOption.APPEND);*/
                     edu.illinois.cs.testrunner.configuration.Configuration.config().properties().
                             setProperty("testplugin.runner.idempotent.num.runs", "-1");
+                    System.out.println("phase 1 results: " + phase1Result.get().results());
                 }
                 catch(Exception e) {
                     System.out.println("error in phase 1: " + e);
                 }
-                System.out.println("finished passing order state capturing!!");
+                System.out.println("finished phase 1!!");
 
                 if(phase1Result.get().results().get(dtname+":1").result().toString().equals("PASS")) {
                     System.out.println("enter phase 2!!!");
@@ -99,7 +97,7 @@ public class iFixPlusPlugin extends TestPlugin {
                             "doublevictim,".getBytes(),
                             StandardOpenOption.APPEND);
                     try {
-                        runner.runList(doubleVictim());
+                        runner.runList(victim());
                     }
                     catch (Exception e){
                         System.out.println("error in phase 1: " + e);
@@ -156,6 +154,44 @@ public class iFixPlusPlugin extends TestPlugin {
                 else {
                     System.out.println("cannot do diff, the number of xml files is not 2!!");
                 }
+
+                String diffFile = diffFieldsFold + "/0.txt";
+                //create the reflection file
+                File reflectionFile = new File(reflectionFold+"/0.txt");
+                reflectionFile.createNewFile();
+                boolean reflectionSuccess = false;
+                try (BufferedReader br = new BufferedReader(new FileReader(diffFile))) {
+                    String diffField;
+                    while ((diffField = br.readLine()) != null) {
+                        System.out.println("diffField:" + diffField);
+                        String s = "diffField:" + diffField;
+                        write2tmp(s);
+                        try {
+                            System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+                            Try<TestRunResult> result = runner.runList(testFailOrder());
+                            if(result.get().results().get(dtname).result().toString().equals("PASS")) {
+                                System.out.println("reflection on diffField: " + diffField + " is success!!");
+                                String output = diffField + " success\n";
+                                Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
+                                        StandardOpenOption.APPEND);
+                                reflectionSuccess = true;
+                            }
+                        } catch (Exception e) {
+                            System.out.println("error in reflection for field: "
+                                    + diffField + " " + e);
+                        }
+                    }
+                }
+                if(reflectionSuccess) {
+                    Files.write(Paths.get(output),
+                            "reflectSuccess,".getBytes(),
+                            StandardOpenOption.APPEND);
+                }
+                else {
+                    Files.write(Paths.get(output),
+                            "reflectFail,".getBytes(),
+                            StandardOpenOption.APPEND);
+                }
             } catch (Exception e) {
                 TestPluginPlugin.mojo().getLog().error(e);
             }
@@ -170,7 +206,7 @@ public class iFixPlusPlugin extends TestPlugin {
         writer.close();
     }
 
-    private List<String> doubleVictim() {
+    private List<String> victim() {
         List<String> partialOrder = new ArrayList<>();
         partialOrder.add(dtname);
         return partialOrder;
