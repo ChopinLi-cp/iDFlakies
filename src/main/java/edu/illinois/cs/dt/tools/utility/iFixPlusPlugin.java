@@ -176,6 +176,11 @@ public class iFixPlusPlugin extends TestPlugin {
                                         StandardOpenOption.APPEND);
                                 reflectionSuccess = true;
                             }
+                            else {
+                                String output = diffField + " setbutfailed\n";
+                                Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
+                                        StandardOpenOption.APPEND);
+                            }
                         } catch (Exception e) {
                             System.out.println("error in reflection for field: "
                                     + diffField + " " + e);
