@@ -44,6 +44,7 @@ public class iFixPlusPlugin extends TestPlugin {
     //private String lognum;
     @Override
     public void execute(final MavenProject mavenProject) {
+        long startTime = System.currentTimeMillis();
         final Option<Runner> runnerOption = RunnerFactory.from(mavenProject);
 
         replayPath = Paths.get(Configuration.config().getProperty("replay.path"));
@@ -155,50 +156,34 @@ public class iFixPlusPlugin extends TestPlugin {
                     System.out.println("cannot do diff, the number of xml files is not 2!!");
                 }
 
-                /*String diffFile = diffFieldsFold + "/0.txt";
+                String diffFile = diffFieldsFold + "/0.txt";
                 //create the reflection file
                 File reflectionFile = new File(reflectionFold+"/0.txt");
                 reflectionFile.createNewFile();
-                boolean reflectionSuccess = false;
-                try (BufferedReader br = new BufferedReader(new FileReader(diffFile))) {
-                    String diffField;
-                    while ((diffField = br.readLine()) != null) {
-                        System.out.println("diffField:" + diffField);
-                        String s = "diffField:" + diffField;
-                        write2tmp(s);
-                        try {
-                            System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-                            Try<TestRunResult> result = runner.runList(testFailOrder());
-                            if(result.get().results().get(dtname).result().toString().equals("PASS")) {
-                                System.out.println("reflection on diffField: " + diffField + " is success!!");
-                                String output = diffField + " success\n";
-                                Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
-                                        StandardOpenOption.APPEND);
-                                reflectionSuccess = true;
-                            }
-                            else {
-                                String output = diffField + " setbutfailed\n";
-                                Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
-                                        StandardOpenOption.APPEND);
-                            }
-                        } catch (Exception e) {
-                            System.out.println("error in reflection for field: "
-                                    + diffField + " " + e);
-                        }
-                    }
-                }
-                if(reflectionSuccess) {
-                    Files.write(Paths.get(output),
-                            "reflectSuccess,".getBytes(),
+
+                String prefix = "diffFieldBefore ";
+                boolean reflectBeforeSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
+                if(reflectBeforeSuccess) {
+                    Files.write(Paths.get(output), "BeforeSuccess,".getBytes(),
                             StandardOpenOption.APPEND);
                 }
                 else {
-                    Files.write(Paths.get(output),
-                            "reflectFail,".getBytes(),
+                    Files.write(Paths.get(output), "BeforeFail,".getBytes(),
                             StandardOpenOption.APPEND);
-                }*/
+                }
 
-                boolean reflectionSuccess = false;
+                prefix = "diffFieldAfter " + lastPolluter() + " ";
+                boolean reflectAfterSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
+                if(reflectAfterSuccess) {
+                    Files.write(Paths.get(output), "AfterSuccess,".getBytes(),
+                            StandardOpenOption.APPEND);
+                }
+                else {
+                    Files.write(Paths.get(output), "AfterFail,".getBytes(),
+                            StandardOpenOption.APPEND);
+                }
+
+                /*boolean reflectionSuccess = false;
                 System.out.println("enter phase 6!!!");
                 write2tmp("6");
 
@@ -271,7 +256,7 @@ public class iFixPlusPlugin extends TestPlugin {
                 else
                     Files.write(Paths.get(output),
                             "reflectFail,".getBytes(),
-                            StandardOpenOption.APPEND);
+                            StandardOpenOption.APPEND);*/
 
             } catch (Exception e) {
                 TestPluginPlugin.mojo().getLog().error(e);
@@ -279,6 +264,58 @@ public class iFixPlusPlugin extends TestPlugin {
         } else {
             TestPluginPlugin.mojo().getLog().info("Module is not using a supported test framework (probably not JUnit).");
         }
+        timing(startTime);
+    }
+
+    private void timing(long startTime) {
+        long endTime = System.currentTimeMillis();
+        double duration = (endTime - startTime)/1000.0;
+
+        String time = duration + ",";
+        try {
+            Files.write(Paths.get(output), time.getBytes(),
+                    StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private boolean reflectEachField(String diffFile, File reflectionFile, Runner runner, String prefix) throws IOException {
+        boolean reflectSuccess = false;
+        String header = "*************************reflection on " + prefix.split(" ")[0] + "************************\n";
+        Files.write(Paths.get(reflectionFile.getAbsolutePath()), header.getBytes(),
+                StandardOpenOption.APPEND);
+
+        try (BufferedReader br = new BufferedReader(new FileReader(diffFile))) {
+            String diffField;
+            while ((diffField = br.readLine()) != null) {
+                System.out.println(prefix + diffField);
+                String s = prefix + diffField;
+                write2tmp(s);
+                try {
+                    System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+                    Try<TestRunResult> result = runner.runList(testFailOrder());
+                    if(result.get().results().get(dtname).result().toString().equals("PASS")) {
+                        System.out.println("reflection on diffField: " + diffField + " is success!!");
+                        String output = "########" + diffField + " made test success#######\n";
+                        Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
+                                StandardOpenOption.APPEND);
+                        reflectSuccess = true;
+                    }
+                    else {
+                        String output = "########" + diffField + " made test fail######\n";
+                        Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
+                                StandardOpenOption.APPEND);
+                    }
+                } catch (Exception e) {
+                    System.out.println("error in reflection for field: "
+                            + diffField + " " + e);
+                }
+            }
+        }
+
+        return reflectSuccess;
+
     }
 
     private void write2tmp(String s) throws FileNotFoundException, UnsupportedEncodingException {
