@@ -120,8 +120,12 @@ public class iFixPlusPlugin extends TestPlugin {
                     System.out.println("passOrder: " + testPassOrder());
                 }
 
+                xmlFileNum = new File(xmlFold).listFiles().length;
+                System.out.println("xmlFileName: " + xmlFileNum);
+
                 System.out.println("enter phase 4!!");
-                write2tmp("4");
+                //write2tmp("4");
+                write2tmp("4 " + lastPolluter());
 
                 if(testFailOrder()==null) {
                     System.out.println("Something wrong in reading the failing order file!!");
@@ -138,7 +142,8 @@ public class iFixPlusPlugin extends TestPlugin {
                 System.out.println("FailOrder: " + testFailOrder());
 
                 System.out.println("enter phase 5!!!");
-                write2tmp("5");
+                //write2tmp("5");
+                write2tmp("5 " + lastPolluter());
 
                 xmlFileNum = new File(xmlFold).listFiles().length;
                 System.out.println("xmlFileNum: " + xmlFileNum);
@@ -161,7 +166,7 @@ public class iFixPlusPlugin extends TestPlugin {
                 File reflectionFile = new File(reflectionFold+"/0.txt");
                 reflectionFile.createNewFile();
 
-                String prefix = "diffFieldBefore ";
+               /* String prefix = "diffFieldBefore ";
                 boolean reflectBeforeSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
                 if(reflectBeforeSuccess) {
                     Files.write(Paths.get(output), "BeforeSuccess,".getBytes(),
@@ -170,16 +175,16 @@ public class iFixPlusPlugin extends TestPlugin {
                 else {
                     Files.write(Paths.get(output), "BeforeFail,".getBytes(),
                             StandardOpenOption.APPEND);
-                }
+                }*/
 
-                prefix = "diffFieldAfter " + lastPolluter() + " ";
+                String prefix = "diffFieldAfter " + lastPolluter() + " ";
                 boolean reflectAfterSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
                 if(reflectAfterSuccess) {
-                    Files.write(Paths.get(output), "AfterSuccess,".getBytes(),
+                    Files.write(Paths.get(output), "ReflectSuccess,".getBytes(),
                             StandardOpenOption.APPEND);
                 }
                 else {
-                    Files.write(Paths.get(output), "AfterFail,".getBytes(),
+                    Files.write(Paths.get(output), "ReflectFail,".getBytes(),
                             StandardOpenOption.APPEND);
                 }
 
@@ -353,6 +358,36 @@ public class iFixPlusPlugin extends TestPlugin {
     }
 
     private List<String> testFailOrder() throws IOException {
+        if(replayPath2.toString().equals("")) {
+            return testFailOrder_full();
+        }
+        else {
+            return testFailOrder_minimized();
+        }
+    }
+
+    private List<String> testFailOrder_full() throws IOException {
+        try {
+            System.out.println("$$$$$$$$$$$modeluePath: " + PathManager.modulePath());
+            List<DependentTest> dtl = new Gson().fromJson(FileUtil.readFile(replayPath), DependentTestList.class).dts();
+            System.out.println("dtl!!!!!!!!!!!");
+            //must have one dt in dtl
+            DependentTest dt = dtl.get(0);
+
+            List<String> partialOrder = new ArrayList<String>();
+            for(String s: dt.revealed().order()) {
+                partialOrder.add(s);
+                if(s.equals(dt.name()))
+                    break;
+            }
+            return partialOrder;
+        } catch (Exception e) {
+            System.out.println("expection in reading json!!!!!");
+            return null;
+        }
+    }
+
+    private List<String> testFailOrder_minimized() throws IOException {
         List<String> failingTests = new ArrayList<String>();
         try {
             System.out.println("$$$$$$$$$$$replayPath2: " + replayPath2);
@@ -373,6 +408,25 @@ public class iFixPlusPlugin extends TestPlugin {
     }
 
     private String lastPolluter() throws IOException {
+        if(replayPath2.toString().equals("")) {
+            return lastPolluter_full();
+        }
+        else {
+            return lastPolluter_minimized();
+        }
+    }
+
+    private String lastPolluter_full() throws IOException {
+        try {
+            List<String> failorder = testFailOrder_full();
+            return failorder.get(failorder.size()-2);
+        } catch (Exception e) {
+            System.out.println("expection in lastPolluter_full!!!!!");
+            return null;
+        }
+    }
+
+    private String lastPolluter_minimized() throws IOException {
         try {
             System.out.println("$$$$$$$$$$$replayPath2: " + replayPath2);
             List<PolluterData> polluters = new Gson().fromJson(FileUtil.readFile(replayPath2), MinimizeTestsResult.class).polluters();
