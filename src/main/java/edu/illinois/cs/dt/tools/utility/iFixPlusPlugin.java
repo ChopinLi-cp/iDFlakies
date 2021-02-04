@@ -84,15 +84,15 @@ public class iFixPlusPlugin extends TestPlugin {
                             StandardOpenOption.APPEND);
                     return;
                 }
-                /*result = runner.runList(testPassOrder());
+                result = runner.runList(testPassOrder());
                 System.out.println("pass order result: " + result);
-                if(!result.get().results().get(dtname).result().toString().equals("Pass")) {
+                if(!result.get().results().get(dtname).result().toString().equals("PASS")) {
                     System.out.println("json file wrong!!");
                     Files.write(Paths.get(output),
                             "wrongjson,".getBytes(),
                             StandardOpenOption.APPEND);
                     return;
-                }*/
+                }
 
 
                  //phase 1
