@@ -72,6 +72,26 @@ public class iFixPlusPlugin extends TestPlugin {
                 System.out.println("tests!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" +
                         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
+                // phase 0
+                Try<TestRunResult> result = runner.runList(testFailOrder());
+                //System.out.println("fail order result: " +  result);
+                if(result.get().results().get(dtname).result().toString().equals("Pass")) {
+                    System.out.println("json file wrong!!");
+                    Files.write(Paths.get(output),
+                            "wrongjson,".getBytes(),
+                            StandardOpenOption.APPEND);
+                    return;
+                }
+                result = runner.runList(testPassOrder());
+                System.out.println("pass order result: " + result);
+                if(!result.get().results().get(dtname).result().toString().equals("Pass")) {
+                    System.out.println("json file wrong!!");
+                    Files.write(Paths.get(output),
+                            "wrongjson,".getBytes(),
+                            StandardOpenOption.APPEND);
+                    return;
+                }
+
                  //phase 1
                 Try<TestRunResult> phase1Result = null;
                 try{
