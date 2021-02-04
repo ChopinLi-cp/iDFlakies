@@ -75,7 +75,9 @@ public class iFixPlusPlugin extends TestPlugin {
                 // phase 0 check json file
                 Try<TestRunResult> result = runner.runList(testFailOrder());
                 //System.out.println("fail order result: " +  result);
-                if(result.get().results().get(dtname).result().toString().equals("Pass")) {
+                System.out.println("falingg order results: " + result.get().results().
+                        get(dtname).result().toString());
+                if(result.get().results().get(dtname).result().toString().equals("PASS")) {
                     System.out.println("json file wrong!!");
                     Files.write(Paths.get(output),
                             "wrongjson,".getBytes(),
