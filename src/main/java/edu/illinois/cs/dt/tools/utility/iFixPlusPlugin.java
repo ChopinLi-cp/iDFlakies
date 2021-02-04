@@ -191,7 +191,7 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 System.out.println("reflection begin!!\n");
 
-                String prefix = "diffFieldBefore ";
+                /*String prefix = "diffFieldBefore ";
                 boolean reflectBeforeSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
                 if(reflectBeforeSuccess) {
                     Files.write(Paths.get(output), "BeforeSuccess,".getBytes(),
@@ -200,9 +200,9 @@ public class iFixPlusPlugin extends TestPlugin {
                 else {
                     Files.write(Paths.get(output), "BeforeFail,".getBytes(),
                             StandardOpenOption.APPEND);
-                }
+                }*/
 
-                prefix = "diffFieldAfter " + lastPolluter() + " ";
+                String prefix = "diffFieldAfter " + lastPolluter() + " ";
                 boolean reflectAfterSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
                 if(reflectAfterSuccess) {
                     Files.write(Paths.get(output), "AfterSuccess,".getBytes(),
