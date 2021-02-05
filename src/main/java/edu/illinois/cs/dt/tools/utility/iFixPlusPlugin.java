@@ -101,8 +101,6 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 System.out.println("phase 0 ends");
 
-
-
                  //phase 1
                 Try<TestRunResult> phase1Result = null;
                 try{
@@ -154,27 +152,33 @@ public class iFixPlusPlugin extends TestPlugin {
                 xmlFileNum = new File(xmlFold).listFiles().length;
                 System.out.println("xmlFileName: " + xmlFileNum);
 
-                System.out.println("enter phase 4!!");
-                //write2tmp("4");
-                write2tmp("4 " + lastPolluter());
-
-                if(testFailOrder()==null) {
-                    System.out.println("Something wrong in reading the failing order file!!");
-                    return;
-                }
+                System.out.println("enter phase 4 before!!");
+                write2tmp("4");
                 try {
                     runner.runList(testFailOrder());
                 }
                 catch(Exception e) {
-                    System.out.println("error in phase 4!! " + e);
+                    System.out.println("error in phase 4 before!! " + e);
+
+                }
+
+                if(new File(xmlFold).listFiles().length!=2) {
+                    write2tmp("4 " + lastPolluter());
+                    System.out.println("enter phase 4 after!!");
+                    try {
+                        runner.runList(testFailOrder());
+                    }
+                    catch(Exception e) {
+                        System.out.println("error in phase 4 after!! " + e);
+
+                    }
                 }
 
                 System.out.println("finish phase 4!!");
                 System.out.println("FailOrder: " + testFailOrder());
 
                 System.out.println("enter phase 5!!!");
-                //write2tmp("5");
-                write2tmp("5 " + lastPolluter());
+                write2tmp("5");
 
                 xmlFileNum = new File(xmlFold).listFiles().length;
                 System.out.println("xmlFileNum: " + xmlFileNum);
@@ -182,7 +186,7 @@ public class iFixPlusPlugin extends TestPlugin {
                     System.out.println("begining diff!!!!!!!!!!");
                     try {
                         System.out.println("doing diff%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-                        runner.runList(testFailOrder());
+                        runner.runList(testPassOrder());
                         // runner.wait();
                     } catch (Exception e) {
                         System.out.println("error in failing failing order!" + e);
