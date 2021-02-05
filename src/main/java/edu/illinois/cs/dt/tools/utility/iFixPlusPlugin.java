@@ -162,6 +162,8 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 }
 
+                System.out.println("finish phase 4 before!!");
+
                 if(new File(xmlFold).listFiles().length!=2) {
                     write2tmp("4 " + lastPolluter());
                     System.out.println("enter phase 4 after!!");
@@ -172,10 +174,10 @@ public class iFixPlusPlugin extends TestPlugin {
                         System.out.println("error in phase 4 after!! " + e);
 
                     }
+                    System.out.println("finish phase 4 after!!");
                 }
 
-                System.out.println("finish phase 4!!");
-                System.out.println("FailOrder: " + testFailOrder());
+                //System.out.println("FailOrder: " + testFailOrder());
 
                 System.out.println("enter phase 5!!!");
                 write2tmp("5");
