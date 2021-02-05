@@ -73,18 +73,34 @@ public class iFixPlusPlugin extends TestPlugin {
                         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
                 // phase 0 check json file
-                Try<TestRunResult> result = runner.runList(testFailOrder());
-                //System.out.println("fail order result: " +  result);
-                System.out.println("falingg order results: " + result.get().results().
-                        get(dtname).result().toString());
-                if(result.get().results().get(dtname).result().toString().equals("PASS")) {
+                System.out.println("phase 0 begin");
+                write2tmp("0");
+                if(testFailOrder()==null) {
+                    Files.write(Paths.get(output),
+                            "wrongjson,".getBytes(),
+                            StandardOpenOption.APPEND);
+                    System.out.println("original json file wrong!!");
+                    return;
+                }
+
+                Try<TestRunResult> phase0ResultFail = null;
+                try{
+                    phase0ResultFail = runner.runList(testFailOrder());
+                }
+                catch(Exception ex) {
+                    System.out.println("error in phase 0 failing order: " + ex);
+                }
+
+                if(phase0ResultFail.get().results().get(dtname).result().toString().equals("PASS")) {
                     System.out.println("json file wrong!!");
                     Files.write(Paths.get(output),
                             "wrongjson,".getBytes(),
                             StandardOpenOption.APPEND);
                     return;
                 }
-                result = runner.runList(testPassOrder());
+
+                System.out.println("phase 0 ends");
+                /*result = runner.runList(testPassOrder());
                 System.out.println("pass order result: " + result);
                 if(!result.get().results().get(dtname).result().toString().equals("PASS")) {
                     System.out.println("json file wrong!!");
@@ -92,7 +108,7 @@ public class iFixPlusPlugin extends TestPlugin {
                             "wrongjson,".getBytes(),
                             StandardOpenOption.APPEND);
                     return;
-                }
+                }*/
 
 
                  //phase 1
@@ -393,19 +409,27 @@ public class iFixPlusPlugin extends TestPlugin {
 
     private List<String> testFailOrder_full() throws IOException {
         try {
-            System.out.println("$$$$$$$$$$$modeluePath: " + PathManager.modulePath());
+            System.out.println("$$$$$$$$$$$testFailOrder_full: " + PathManager.modulePath());
             List<DependentTest> dtl = new Gson().fromJson(FileUtil.readFile(replayPath), DependentTestList.class).dts();
             System.out.println("dtl!!!!!!!!!!!");
             //must have one dt in dtl
-            DependentTest dt = dtl.get(0);
-
             List<String> partialOrder = new ArrayList<String>();
-            for(String s: dt.revealed().order()) {
-                partialOrder.add(s);
-                if(s.equals(dt.name()))
-                    break;
+            for(int i = 0; i< dtl.size(); i++ ) {
+                DependentTest dt = dtl.get(i);
+                if(dt.name().equals(dtname)) {
+                    for(String s: dt.revealed().order()) {
+                        partialOrder.add(s);
+                        if(s.equals(dt.name()))
+                            break;
+                    }
+                    if(partialOrder.contains(dtname))
+                        return partialOrder;
+                    else
+                        return null;
+                }
             }
-            return partialOrder;
+            return null;
+
         } catch (Exception e) {
             System.out.println("expection in reading json!!!!!");
             return null;
