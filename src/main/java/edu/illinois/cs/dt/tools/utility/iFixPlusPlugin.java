@@ -77,11 +77,21 @@ public class iFixPlusPlugin extends TestPlugin {
                 write2tmp("0");
                 if(testFailOrder()==null) {
                     Files.write(Paths.get(output),
-                            "wrongjson,".getBytes(),
+                            "wrongjsonfail,".getBytes(),
                             StandardOpenOption.APPEND);
                     System.out.println("original json file wrong!!");
                     return;
                 }
+
+                if(testPassOrder_full()==null) {
+                    Files.write(Paths.get(output),
+                            "wrongjsonpass,".getBytes(),
+                            StandardOpenOption.APPEND);
+                    System.out.println("original json file wrong!!");
+                    return;
+                }
+
+
 
                 Try<TestRunResult> phase0ResultFail = null;
                 try{
@@ -94,7 +104,23 @@ public class iFixPlusPlugin extends TestPlugin {
                 if(phase0ResultFail.get().results().get(dtname).result().toString().equals("PASS")) {
                     System.out.println("json file wrong!!");
                     Files.write(Paths.get(output),
-                            "wrongjson,".getBytes(),
+                            "wrongjsonfail2,".getBytes(),
+                            StandardOpenOption.APPEND);
+                    return;
+                }
+
+                Try<TestRunResult> phase0ResultPass = null;
+                try{
+                    phase0ResultPass = runner.runList(testPassOrder_full());
+                }
+                catch(Exception ex) {
+                    System.out.println("error in phase 0 pass order: " + ex);
+                }
+
+                if(!phase0ResultPass.get().results().get(dtname).result().toString().equals("PASS")) {
+                    System.out.println("json file wrong!!");
+                    Files.write(Paths.get(output),
+                            "wrongjsonpass2,".getBytes(),
                             StandardOpenOption.APPEND);
                     return;
                 }
@@ -120,9 +146,11 @@ public class iFixPlusPlugin extends TestPlugin {
                 }
                 System.out.println("finished phase 1!!");
 
+                boolean doublevictim = false;
                 if(phase1Result.get().results().get(dtname+":1").result().toString().equals("PASS")) {
                     System.out.println("enter phase 2!!!");
                     write2tmp("2");
+                    doublevictim = true;
                     Files.write(Paths.get(output),
                             "doublevictim,".getBytes(),
                             StandardOpenOption.APPEND);
@@ -140,13 +168,13 @@ public class iFixPlusPlugin extends TestPlugin {
                             "passorder,".getBytes(),
                             StandardOpenOption.APPEND);
                     try{
-                        runner.runList(testPassOrder());
+                        runner.runList(testPassOrder_full());
                     }
                     catch(Exception e) {
                         System.out.println("error in running passing order!");
                     }
                     System.out.println("finished passing order state capturing!!");
-                    System.out.println("passOrder: " + testPassOrder());
+                    System.out.println("passOrder: " + testPassOrder_full());
                 }
 
                 xmlFileNum = new File(xmlFold).listFiles().length;
@@ -180,18 +208,32 @@ public class iFixPlusPlugin extends TestPlugin {
                 //System.out.println("FailOrder: " + testFailOrder());
 
                 System.out.println("enter phase 5!!!");
-                write2tmp("5");
+
 
                 xmlFileNum = new File(xmlFold).listFiles().length;
                 System.out.println("xmlFileNum: " + xmlFileNum);
                 if(xmlFileNum == 2) {
                     System.out.println("begining diff!!!!!!!!!!");
-                    try {
-                        System.out.println("doing diff%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-                        runner.runList(testPassOrder());
-                        // runner.wait();
-                    } catch (Exception e) {
-                        System.out.println("error in failing failing order!" + e);
+                    if(doublevictim) {
+                        System.out.println("doublevictim!!");
+                        write2tmp("5doublevic");
+                        try {
+                            runner.runList(victim());
+                        }
+                        catch (Exception e){
+                            System.out.println("error in phase 1: " + e);
+                        }
+                    }
+                    else{
+                        System.out.println("passorder!!");
+                        write2tmp("5");
+                        try {
+                            System.out.println("doing diff%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+                            runner.runList(testPassOrder_full());
+                            // runner.wait();
+                        } catch (Exception e) {
+                            System.out.println("error in failing failing order!" + e);
+                        }
                     }
                 }
                 else {
@@ -374,7 +416,7 @@ public class iFixPlusPlugin extends TestPlugin {
         return partialOrder;
     }
 
-    private List<String> testPassOrder() throws IOException {
+    /*private List<String> testPassOrder() throws IOException {
         try {
             System.out.println("$$$$$$$$$$$modeluePath: " + PathManager.modulePath());
             List<DependentTest> dtl = new Gson().fromJson(FileUtil.readFile(replayPath), DependentTestList.class).dts();
@@ -393,6 +435,37 @@ public class iFixPlusPlugin extends TestPlugin {
         } catch (Exception e) {
             System.out.println("expection in reading json!!!!!");
             return Files.readAllLines(replayPath);
+        }
+    }*/
+
+    private List<String> testPassOrder_full() throws IOException {
+        try {
+            System.out.println("$$$$$$$$$$$testPassOrder_full: " + PathManager.modulePath());
+            List<DependentTest> dtl = new Gson().fromJson(FileUtil.readFile(replayPath), DependentTestList.class).dts();
+            System.out.println("dtl!!!!!!!!!!!");
+            //must have one dt in dtl
+            List<String> partialOrder = new ArrayList<String>();
+            for(int i = 0; i< dtl.size(); i++ ) {
+                DependentTest dt = dtl.get(i);
+                if(dt.name().equals(dtname)) {
+                    for(String s: dt.intended().order()) {
+                        partialOrder.add(s);
+                        if(s.equals(dt.name()))
+                            break;
+                    }
+                    if(!partialOrder.contains(dtname)) {
+                        partialOrder.add(dtname);
+                    }
+                    System.out.println("testFailOrder_full1 : " + dtname);
+                    return partialOrder;
+                }
+            }
+            System.out.println("testFailOrder_full2: " + dtname);
+            return null;
+
+        } catch (Exception e) {
+            System.out.println("expection in reading json!!!!!");
+            return null;
         }
     }
 
@@ -420,12 +493,14 @@ public class iFixPlusPlugin extends TestPlugin {
                         if(s.equals(dt.name()))
                             break;
                     }
-                    if(partialOrder.contains(dtname))
-                        return partialOrder;
-                    else
-                        return null;
+                    if(!partialOrder.contains(dtname)) {
+                        partialOrder.add(dtname);
+                    }
+                    System.out.println("testFailOrder_full1 : " + dtname);
+                    return partialOrder;
                 }
             }
+            System.out.println("testFailOrder_full2: " + dtname);
             return null;
 
         } catch (Exception e) {
