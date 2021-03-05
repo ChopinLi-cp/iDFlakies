@@ -93,37 +93,43 @@ public class iFixPlusPlugin extends TestPlugin {
 
 
 
-                Try<TestRunResult> phase0ResultFail = null;
-                try{
-                    phase0ResultFail = runner.runList(testFailOrder());
-                }
-                catch(Exception ex) {
-                    System.out.println("error in phase 0 failing order: " + ex);
+
+                for(int i=0; i<10; i++) {
+                    Try<TestRunResult> phase0ResultFail = null;
+                    try{
+                        phase0ResultFail = runner.runList(testFailOrder());
+                    }
+                    catch(Exception ex) {
+                        System.out.println("error in phase 0 failing order: " + ex);
+                    }
+
+                    if(phase0ResultFail.get().results().get(dtname).result().toString().equals("PASS")) {
+                        System.out.println("json file wrong!!");
+                        Files.write(Paths.get(output),
+                                "wrongjsonfail2,".getBytes(),
+                                StandardOpenOption.APPEND);
+                        return;
+                    }
                 }
 
-                if(phase0ResultFail.get().results().get(dtname).result().toString().equals("PASS")) {
-                    System.out.println("json file wrong!!");
-                    Files.write(Paths.get(output),
-                            "wrongjsonfail2,".getBytes(),
-                            StandardOpenOption.APPEND);
-                    return;
+                for(int i=0; i<10; i++) {
+                    Try<TestRunResult> phase0ResultPass = null;
+                    try{
+                        phase0ResultPass = runner.runList(testPassOrder_full());
+                    }
+                    catch(Exception ex) {
+                        System.out.println("error in phase 0 pass order: " + ex);
+                    }
+
+                    if(!phase0ResultPass.get().results().get(dtname).result().toString().equals("PASS")) {
+                        System.out.println("json file wrong!!");
+                        Files.write(Paths.get(output),
+                                "wrongjsonpass2,".getBytes(),
+                                StandardOpenOption.APPEND);
+                        return;
+                    }
                 }
 
-                Try<TestRunResult> phase0ResultPass = null;
-                try{
-                    phase0ResultPass = runner.runList(testPassOrder_full());
-                }
-                catch(Exception ex) {
-                    System.out.println("error in phase 0 pass order: " + ex);
-                }
-
-                if(!phase0ResultPass.get().results().get(dtname).result().toString().equals("PASS")) {
-                    System.out.println("json file wrong!!");
-                    Files.write(Paths.get(output),
-                            "wrongjsonpass2,".getBytes(),
-                            StandardOpenOption.APPEND);
-                    return;
-                }
 
                 System.out.println("phase 0 ends");
 
@@ -247,7 +253,7 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 System.out.println("reflection begin!!\n");
 
-                String prefix = "diffFieldBefore ";
+                /*String prefix = "diffFieldBefore ";
                 boolean reflectBeforeSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
                 if(reflectBeforeSuccess) {
                     Files.write(Paths.get(output), "BeforeSuccess,".getBytes(),
@@ -256,9 +262,9 @@ public class iFixPlusPlugin extends TestPlugin {
                 else {
                     Files.write(Paths.get(output), "BeforeFail,".getBytes(),
                             StandardOpenOption.APPEND);
-                }
+                }*/
 
-                prefix = "diffFieldAfter " + lastPolluter() + " ";
+                String prefix = "diffFieldAfter " + lastPolluter() + " ";
                 boolean reflectAfterSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
                 if(reflectAfterSuccess) {
                     Files.write(Paths.get(output), "AfterSuccess,".getBytes(),
