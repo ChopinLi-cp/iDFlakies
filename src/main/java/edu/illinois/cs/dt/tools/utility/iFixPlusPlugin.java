@@ -91,9 +91,6 @@ public class iFixPlusPlugin extends TestPlugin {
                     return;
                 }
 
-
-
-
                 for(int i=0; i<10; i++) {
                     Try<TestRunResult> phase0ResultFail = null;
                     try{
@@ -265,14 +262,21 @@ public class iFixPlusPlugin extends TestPlugin {
                 }*/
 
                 String prefix = "diffFieldAfter " + lastPolluter() + " ";
-                boolean reflectAfterSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
-                if(reflectAfterSuccess) {
-                    Files.write(Paths.get(output), "AfterSuccess,".getBytes(),
+                boolean reflectAfterOneSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
+                if(reflectAfterOneSuccess) {
+                    Files.write(Paths.get(output), "AfterOneSuccess,".getBytes(),
                             StandardOpenOption.APPEND);
                 }
                 else {
-                    Files.write(Paths.get(output), "AfterFail,".getBytes(),
-                            StandardOpenOption.APPEND);
+                    boolean reflectAfterTwoSuccess = reflectEachTwoField(diffFile, reflectionFile, runner, prefix);
+                    if(reflectAfterTwoSuccess) {
+                        Files.write(Paths.get(output), "AfterTwoSuccess,".getBytes(),
+                                StandardOpenOption.APPEND);
+                    }
+                    else {
+                        Files.write(Paths.get(output), "AfterTwoFail,".getBytes(),
+                                StandardOpenOption.APPEND);
+                    }
                 }
 
                 /*boolean reflectionSuccess = false;
@@ -409,6 +413,104 @@ public class iFixPlusPlugin extends TestPlugin {
         return reflectSuccess;
 
     }
+
+    private boolean reflectEachTwoField(String diffFile, File reflectionFile, Runner runner, String prefix) throws IOException {
+        boolean reflectSuccess = false;
+        String header = "*************************reflection two on " + prefix.split(" ")[0] + "************************\n";
+        Files.write(Paths.get(reflectionFile.getAbsolutePath()), header.getBytes(),
+                StandardOpenOption.APPEND);
+
+        List<String> diffFields = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(diffFile))) {
+            String diffField;
+            while ((diffField = br.readLine()) != null) {
+                diffFields.add(diffField);
+            }
+        }
+
+        List<List<String>> twocomboList = printCombination(diffFields, 2);
+        for(int i=0; i<twocomboList.size(); i++) {
+            List<String> twocombo = twocomboList.get(i);
+            twocombo.get(0);
+            twocombo.get(1);
+            String s = prefix + twocombo.get(0) + " " + twocombo.get(1);
+            write2tmp(s);
+            try {
+                System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+                Try<TestRunResult> result = runner.runList(testFailOrder());
+                if(result.get().results().get(dtname).result().toString().equals("PASS")) {
+                    System.out.println("reflection on diffField: " + twocombo.get(0) + " && " + twocombo.get(1) + " is success!!");
+                    String output = "########" + twocombo.get(0) + " && " + twocombo.get(1) + " made test success#######\n";
+                    Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
+                            StandardOpenOption.APPEND);
+                    reflectSuccess = true;
+                }
+                else {
+                    String output = "########" + twocombo.get(0) + " && " + twocombo.get(1) + " made test fail######\n";
+                    Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
+                            StandardOpenOption.APPEND);
+                }
+            } catch (Exception e) {
+                System.out.println("error in reflection for field: "
+                        + twocombo.get(0) + " && " + twocombo.get(1) + " " + e);
+            }
+        }
+        return reflectSuccess;
+    }
+
+
+        /* arr[]  ---> Input Array
+        data[] ---> Temporary array to store current combination
+        start & end ---> Staring and Ending indexes in arr[]
+        index  ---> Current index in data[]
+        r ---> Size of a combination to be printed */
+        static void combinationUtil(List<String> arr, List<String> data, int start,
+                                    int end, int index, int r, List<List<String>> results)
+        {
+            // Current combination is ready to be printed, print it
+            if (index == r)
+            {
+                for (int j=0; j<r; j++)
+                    System.out.print(data.get(j) +" ");
+                System.out.println("");
+
+                List<String> subresults = new ArrayList<>();
+                for (int j=0; j<r; j++) {
+                    subresults.add(data.get(j));
+                }
+
+                results.add(subresults);
+                return;
+            }
+
+            // replace index with all possible elements. The condition
+            // "end-i+1 >= r-index" makes sure that including one element
+            // at index will make a combination with remaining elements
+            // at remaining positions
+            for (int i=start; i<=end && end-i+1 >= r-index; i++)
+            {
+                data.set(index, arr.get(i));
+                combinationUtil(arr, data, i+1, end, index+1, r, results);
+            }
+        }
+
+        // The main function that prints all combinations of size r
+        // in arr[] of size n. This function mainly uses combinationUtil()
+        static List<List<String>>  printCombination(List<String> arr, int r)
+        {
+            // A temporary array to store all combination one by one
+
+            int n = arr.size();
+            List<String> data = new ArrayList<String>();
+            for(int i=0; i<n; i++) {
+                data.add("");
+            }
+            // Print all combination using temprary array 'data[]'
+            List<List<String>> results = new ArrayList<>();
+            combinationUtil(arr, data, 0, n-1, 0, r, results);
+            return results;
+        }
+
 
     private void write2tmp(String s) throws FileNotFoundException, UnsupportedEncodingException {
         PrintWriter writer = new PrintWriter(tmpfile, "UTF-8");
