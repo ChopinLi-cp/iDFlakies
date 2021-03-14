@@ -268,7 +268,7 @@ public class iFixPlusPlugin extends TestPlugin {
                             StandardOpenOption.APPEND);
                 }
                 else {
-                    boolean reflectAfterTwoSuccess = reflectEachTwoField(diffFile, reflectionFile, runner, prefix);
+                    /*boolean reflectAfterTwoSuccess = reflectEachTwoField(diffFile, reflectionFile, runner, prefix);
                     if(reflectAfterTwoSuccess) {
                         Files.write(Paths.get(output), "AfterTwoSuccess,".getBytes(),
                                 StandardOpenOption.APPEND);
@@ -276,7 +276,10 @@ public class iFixPlusPlugin extends TestPlugin {
                     else {
                         Files.write(Paths.get(output), "AfterTwoFail,".getBytes(),
                                 StandardOpenOption.APPEND);
-                    }
+                    }*/
+
+                    Files.write(Paths.get(output), "AfterOneFail,".getBytes(),
+                            StandardOpenOption.APPEND);
                 }
 
                 /*boolean reflectionSuccess = false;
