@@ -100,6 +100,9 @@ public class iFixPlusPlugin extends TestPlugin {
                         System.out.println("error in phase 0 failing order: " + ex);
                     }
 
+                    System.out.println("Failing order results: " +
+                            phase0ResultFail.get().results().get(dtname).result().toString());
+
                     if(phase0ResultFail.get().results().get(dtname).result().toString().equals("PASS")) {
                         System.out.println("json file wrong!!");
                         Files.write(Paths.get(output),
@@ -117,6 +120,8 @@ public class iFixPlusPlugin extends TestPlugin {
                     catch(Exception ex) {
                         System.out.println("error in phase 0 pass order: " + ex);
                     }
+                    System.out.println("passing order results: " +
+                            phase0ResultPass.get().results().get(dtname).result().toString());
 
                     if(!phase0ResultPass.get().results().get(dtname).result().toString().equals("PASS")) {
                         System.out.println("json file wrong!!");
