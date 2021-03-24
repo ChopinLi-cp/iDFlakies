@@ -79,6 +79,7 @@ public class TracerPlugin extends TestPlugin {
                 }
                 else if(testorder.equals("failing")) {
                     System.out.println("failing order");
+                    System.out.println("failing test order: " + testFailOrder());
                     try {
                         runner.runList(testFailOrder());
                     }
@@ -101,7 +102,7 @@ public class TracerPlugin extends TestPlugin {
         long endTime = System.currentTimeMillis();
         double duration = (endTime - startTime)/1000.0;
 
-        String time = duration + "\n";
+        String time = duration;
         try {
             Files.write(Paths.get(output), time.getBytes(),
                     StandardOpenOption.APPEND);
@@ -176,9 +177,15 @@ public class TracerPlugin extends TestPlugin {
                         partialOrder.add(dtname);
                     }
                     System.out.println("testFailOrder_full1 : " + dtname);
-                    return partialOrder;
+                   // return partialOrder;
+                    // test
+                    List<String> test = new ArrayList<>();
+                    test.add(partialOrder.get(partialOrder.size() -2));
+                    test.add(dtname);
+                    return test;
                 }
             }
+
             System.out.println("testFailOrder_full2: " + dtname);
             return null;
 
