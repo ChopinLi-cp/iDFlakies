@@ -102,7 +102,7 @@ public class TracerPlugin extends TestPlugin {
         long endTime = System.currentTimeMillis();
         double duration = (endTime - startTime)/1000.0;
 
-        String time = duration;
+        String time = duration + "";
         try {
             Files.write(Paths.get(output), time.getBytes(),
                     StandardOpenOption.APPEND);

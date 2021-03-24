@@ -135,7 +135,7 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 System.out.println("phase 0 ends");
 
-                 //phase 1
+                 //phase 1: run doublevictim order
                 Try<TestRunResult> phase1Result = null;
                 try{
                     System.out.println("phase 1!!!");
@@ -157,6 +157,7 @@ public class iFixPlusPlugin extends TestPlugin {
                 boolean doublevictim = false;
                 if(phase1Result.get().results().get(dtname+":1").result().toString().equals("PASS")) {
                     System.out.println("enter phase 2!!!");
+                    //phase 2: run doublevictim order state capture
                     write2tmp("2");
                     doublevictim = true;
                     Files.write(Paths.get(output),
@@ -171,6 +172,7 @@ public class iFixPlusPlugin extends TestPlugin {
                 }
                 else {
                     System.out.println("enter phase 3!!!");
+                    // phase 3: run passorder (indicated in the json) state capture;
                     write2tmp("3");
                     Files.write(Paths.get(output),
                             "passorder,".getBytes(),
@@ -188,6 +190,7 @@ public class iFixPlusPlugin extends TestPlugin {
                 xmlFileNum = new File(xmlFold).listFiles().length;
                 System.out.println("xmlFileName: " + xmlFileNum);
 
+                // phase 4: failing order before state capture;
                 System.out.println("enter phase 4 before!!");
                 write2tmp("4");
                 try {
@@ -201,6 +204,7 @@ public class iFixPlusPlugin extends TestPlugin {
                 System.out.println("finish phase 4 before!!");
 
                 if(new File(xmlFold).listFiles().length!=2) {
+                    // phase 4: failing order after state capture;
                     write2tmp("4 " + lastPolluter());
                     System.out.println("enter phase 4 after!!");
                     try {
@@ -215,9 +219,8 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 //System.out.println("FailOrder: " + testFailOrder());
 
+                // phase 5: do the diff
                 System.out.println("enter phase 5!!!");
-
-
                 xmlFileNum = new File(xmlFold).listFiles().length;
                 System.out.println("xmlFileNum: " + xmlFileNum);
                 if(xmlFileNum == 2) {
@@ -248,13 +251,16 @@ public class iFixPlusPlugin extends TestPlugin {
                     System.out.println("cannot do diff, the number of xml files is not 2!!");
                 }
 
+                // output of phase 5
                 String diffFile = diffFieldsFold + "/0.txt";
+
                 //create the reflection file
                 File reflectionFile = new File(reflectionFold+"/0.txt");
                 reflectionFile.createNewFile();
 
                 System.out.println("reflection begin!!\n");
 
+                // reflect at the before state
                 /*String prefix = "diffFieldBefore ";
                 boolean reflectBeforeSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
                 if(reflectBeforeSuccess) {
@@ -266,6 +272,7 @@ public class iFixPlusPlugin extends TestPlugin {
                             StandardOpenOption.APPEND);
                 }*/
 
+                // reflect at the after state
                 String prefix = "diffFieldAfter " + lastPolluter() + " ";
                 boolean reflectAfterOneSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
                 if(reflectAfterOneSuccess) {
@@ -273,6 +280,7 @@ public class iFixPlusPlugin extends TestPlugin {
                             StandardOpenOption.APPEND);
                 }
                 else {
+                    // reflect two fields
                     /*boolean reflectAfterTwoSuccess = reflectEachTwoField(diffFile, reflectionFile, runner, prefix);
                     if(reflectAfterTwoSuccess) {
                         Files.write(Paths.get(output), "AfterTwoSuccess,".getBytes(),
@@ -286,81 +294,6 @@ public class iFixPlusPlugin extends TestPlugin {
                     Files.write(Paths.get(output), "AfterOneFail,".getBytes(),
                             StandardOpenOption.APPEND);
                 }
-
-                /*boolean reflectionSuccess = false;
-                System.out.println("enter phase 6!!!");
-                write2tmp("6");
-
-                File reflectionFile = new File(reflectionFold+"/0.txt");
-                reflectionFile.createNewFile();
-
-                String header = "*************************reflection on all fields at before state************************\n";
-                Files.write(Paths.get(reflectionFile.getAbsolutePath()), header.getBytes(),
-                        StandardOpenOption.APPEND);
-
-                xmlFileNum = new File(xmlFold).listFiles().length;
-                System.out.println("xmlFileNum: " + xmlFileNum);
-                if(xmlFileNum == 2) {
-                    System.out.println("begining reflection all!!!!!!!!!!");
-                    try {
-                        System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-                        Try<TestRunResult> result = runner.runList(testFailOrder());
-                        if(result.get().results().get(dtname).result().toString().equals("PASS")) {
-                            Files.write(Paths.get(output),
-                                    "reflectBeforeSuccess,".getBytes(),
-                                    StandardOpenOption.APPEND);
-                            reflectionSuccess = true;
-                        }
-                        else {
-                            Files.write(Paths.get(output),
-                                    "reflectBeforeFail,".getBytes(),
-                                    StandardOpenOption.APPEND);
-                        }
-                    } catch (Exception e) {
-                        System.out.println("error in failing reflection!" + e);
-                    }
-                }
-                else {
-                    System.out.println("cannot do reflection, the number of xml files is not 2!!");
-                }
-
-                System.out.println("enter phase 6!!!");
-                write2tmp("7 " + lastPolluter() );
-                header = "*************************reflection on all fields at after state************************\n";
-                Files.write(Paths.get(reflectionFile.getAbsolutePath()), header.getBytes(),
-                        StandardOpenOption.APPEND);
-                if(xmlFileNum == 2) {
-                    System.out.println("begining reflection all as phase 7!!!!!!!!!!");
-                    try {
-                        System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-                        Try<TestRunResult> result = runner.runList(testFailOrder());
-                        if(result.get().results().get(dtname).result().toString().equals("PASS")) {
-                            Files.write(Paths.get(output),
-                                    "reflectAfterSuccess,".getBytes(),
-                                    StandardOpenOption.APPEND);
-                            reflectionSuccess = true;
-                        }
-                        else {
-                            Files.write(Paths.get(output),
-                                    "reflectAfterFail,".getBytes(),
-                                    StandardOpenOption.APPEND);
-                        }
-                    } catch (Exception e) {
-                        System.out.println("error in failing reflection at phase 7!" + e);
-                    }
-                }
-                else {
-                    System.out.println("cannot do reflection on phase 7, the number of xml files is not 2!!");
-                }
-
-                if(reflectionSuccess)
-                    Files.write(Paths.get(output),
-                        "reflectSuccess,".getBytes(),
-                        StandardOpenOption.APPEND);
-                else
-                    Files.write(Paths.get(output),
-                            "reflectFail,".getBytes(),
-                            StandardOpenOption.APPEND);*/
 
             } catch (Exception e) {
                 TestPluginPlugin.mojo().getLog().error(e);
