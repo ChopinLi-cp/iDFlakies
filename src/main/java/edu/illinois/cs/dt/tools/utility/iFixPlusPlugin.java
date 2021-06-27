@@ -280,19 +280,19 @@ public class iFixPlusPlugin extends TestPlugin {
                             StandardOpenOption.APPEND);
                 }
                 else {
-                    // reflect two fields
-                    /*boolean reflectAfterTwoSuccess = reflectEachTwoField(diffFile, reflectionFile, runner, prefix);
-                    if(reflectAfterTwoSuccess) {
-                        Files.write(Paths.get(output), "AfterTwoSuccess,".getBytes(),
+                    // reflect fields using delta-debugging
+                    boolean reflectAfterSuccess = reflectFields(diffFile, reflectionFile, runner, prefix);
+                    if(reflectAfterSuccess) {
+                        Files.write(Paths.get(output), "AfterSuccess,".getBytes(),
                                 StandardOpenOption.APPEND);
                     }
                     else {
-                        Files.write(Paths.get(output), "AfterTwoFail,".getBytes(),
+                        Files.write(Paths.get(output), "AfterFail,".getBytes(),
                                 StandardOpenOption.APPEND);
-                    }*/
+                    }
 
-                    Files.write(Paths.get(output), "AfterOneFail,".getBytes(),
-                            StandardOpenOption.APPEND);
+                    // Files.write(Paths.get(output), "AfterOneFail,".getBytes(),
+                    //         StandardOpenOption.APPEND);
                 }
 
             } catch (Exception e) {
@@ -355,9 +355,9 @@ public class iFixPlusPlugin extends TestPlugin {
 
     }
 
-    private boolean reflectEachTwoField(String diffFile, File reflectionFile, Runner runner, String prefix) throws IOException {
+    private boolean reflectFields(String diffFile, File reflectionFile, Runner runner, String prefix) throws IOException {
         boolean reflectSuccess = false;
-        String header = "*************************reflection two on " + prefix.split(" ")[0] + "************************\n";
+        String header = "*************************reflection more than one on " + prefix.split(" ")[0] + "************************\n";
         Files.write(Paths.get(reflectionFile.getAbsolutePath()), header.getBytes(),
                 StandardOpenOption.APPEND);
 
@@ -369,32 +369,25 @@ public class iFixPlusPlugin extends TestPlugin {
             }
         }
 
-        List<List<String>> twocomboList = printCombination(diffFields, 2);
-        for(int i=0; i<twocomboList.size(); i++) {
-            List<String> twocombo = twocomboList.get(i);
-            twocombo.get(0);
-            twocombo.get(1);
-            String s = prefix + twocombo.get(0) + " " + twocombo.get(1);
-            write2tmp(s);
-            try {
-                System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
-                Try<TestRunResult> result = runner.runList(testFailOrder());
-                if(result.get().results().get(dtname).result().toString().equals("PASS")) {
-                    System.out.println("reflection on diffField: " + twocombo.get(0) + " && " + twocombo.get(1) + " is success!!");
-                    String output = "########" + twocombo.get(0) + " && " + twocombo.get(1) + " made test success#######\n";
-                    Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
-                            StandardOpenOption.APPEND);
-                    reflectSuccess = true;
-                }
-                else {
-                    String output = "########" + twocombo.get(0) + " && " + twocombo.get(1) + " made test fail######\n";
-                    Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
-                            StandardOpenOption.APPEND);
-                }
-            } catch (Exception e) {
-                System.out.println("error in reflection for field: "
-                        + twocombo.get(0) + " && " + twocombo.get(1) + " " + e);
+        try {
+            System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
+            ReflectionDeltaDebugger deltaDebugger = new ReflectionDeltaDebugger(runner, dtname, testFailOrder(), diffFields, prefix, tmpfile);
+            List<String> finalDiffFields = deltaDebugger.deltaDebug(diffFields, 1);
+            if(deltaDebugger.checkValid(finalDiffFields)) {
+                System.out.println("reflection on diffFields: " + finalDiffFields + " is success!!");
+                String output = "########" + finalDiffFields + " made test success#######\n";
+                Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
+                        StandardOpenOption.APPEND);
+                reflectSuccess = true;
             }
+            else {
+                String output = "########" + finalDiffFields + " made test fail######\n";
+                Files.write(Paths.get(reflectionFile.getAbsolutePath()), output.getBytes(),
+                        StandardOpenOption.APPEND);
+            }
+        } catch (Exception e) {
+            System.out.println("error in reflection for field: ");
+                    // + finalDiffFields + " " + e);
         }
         return reflectSuccess;
     }
