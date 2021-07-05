@@ -372,7 +372,7 @@ public class iFixPlusPlugin extends TestPlugin {
         try {
             System.out.println("doing reflection%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%");
             ReflectionDeltaDebugger deltaDebugger = new ReflectionDeltaDebugger(runner, dtname, testFailOrder(), diffFields, prefix, tmpfile);
-            List<String> finalDiffFields = deltaDebugger.deltaDebug(diffFields, 1);
+            List<String> finalDiffFields = deltaDebugger.deltaDebug(diffFields, 2);
             if(deltaDebugger.checkValid(finalDiffFields)) {
                 System.out.println("reflection on diffFields: " + finalDiffFields + " is success!!");
                 String output = "########" + finalDiffFields + " made test success#######\n";

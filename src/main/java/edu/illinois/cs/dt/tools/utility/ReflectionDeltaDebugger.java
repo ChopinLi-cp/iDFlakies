@@ -29,15 +29,13 @@ public class ReflectionDeltaDebugger extends DeltaDebugger<String> {
 
     @Override
     public boolean checkValid(List<String> diffFields) {
-        String s = this.prefix;
-        for(int i = 0 ; i < diffFields.size() ; i++) {
-            if (i == 0) {
-                s += diffFields.get(i);
-            }
-            else {
-                s += " " + diffFields.get(i);
-            }
+        StringBuilder sb = new StringBuilder(1024);
+        sb.append(this.prefix);
+        sb.append(diffFields.get(0));
+        for(int i = 1 ; i < diffFields.size() ; i++) {
+                sb.append(" " + diffFields.get(i));
         }
+        String s = sb.toString();
         try{
             write2tmp(s);
         } catch (FileNotFoundException fileNotFoundException){
