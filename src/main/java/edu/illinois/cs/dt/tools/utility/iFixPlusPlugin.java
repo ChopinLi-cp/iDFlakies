@@ -34,7 +34,7 @@ public class iFixPlusPlugin extends TestPlugin {
     private Path replayPath2;
     private String dtname;
     private String dtjavapPath = "";
-    private String xmlFold;
+    private String subxmlFold;
     private String module;
     private String output;
     private String slug;
@@ -52,7 +52,7 @@ public class iFixPlusPlugin extends TestPlugin {
         dtname= Configuration.config().getProperty("replay.dtname");
         output= Configuration.config().getProperty("replay.output");
         slug= Configuration.config().getProperty("replay.slug");
-        xmlFold = Configuration.config().getProperty("replay.xmlFold");
+        subxmlFold = Configuration.config().getProperty("replay.subxmlFold");
         tmpfile = Configuration.config().getProperty("replay.tmpfile");
         module = Configuration.config().getProperty("replay.module");
         diffFieldsFold = Configuration.config().getProperty("replay.diffFieldsFold");
@@ -60,7 +60,7 @@ public class iFixPlusPlugin extends TestPlugin {
 
         //lognum = Configuration.config().getProperty("replay.lognum");
 
-        int xmlFileNum = new File(xmlFold).listFiles().length;
+        int xmlFileNum = countDirNums(subxmlFold);
         System.out.println("xmlFileName: " + xmlFileNum);
 
         if (runnerOption.isDefined() && module.equals(PathManager.modulePath().toString())) {
@@ -187,7 +187,7 @@ public class iFixPlusPlugin extends TestPlugin {
                     System.out.println("passOrder: " + testPassOrder_full());
                 }
 
-                xmlFileNum = new File(xmlFold).listFiles().length;
+                xmlFileNum = countDirNums(subxmlFold);
                 System.out.println("xmlFileName: " + xmlFileNum);
 
                 // phase 4: failing order before state capture;
@@ -203,7 +203,8 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 System.out.println("finish phase 4 before!!");
 
-                if(new File(xmlFold).listFiles().length!=2) {
+                xmlFileNum = countDirNums(subxmlFold);
+                if(xmlFileNum != 2) {
                     // phase 4: failing order after state capture;
                     write2tmp("4 " + lastPolluter());
                     System.out.println("enter phase 4 after!!");
@@ -221,7 +222,8 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 // phase 5: do the diff
                 System.out.println("enter phase 5!!!");
-                xmlFileNum = new File(xmlFold).listFiles().length;
+
+                xmlFileNum = countDirNums(subxmlFold);
                 System.out.println("xmlFileNum: " + xmlFileNum);
                 if(xmlFileNum == 2) {
                     System.out.println("begining diff!!!!!!!!!!");
@@ -291,8 +293,8 @@ public class iFixPlusPlugin extends TestPlugin {
                                 StandardOpenOption.APPEND);
                     }
 
-                    // Files.write(Paths.get(output), "AfterOneFail,".getBytes(),
-                    //         StandardOpenOption.APPEND);
+                    Files.write(Paths.get(output), "AfterOneFail,".getBytes(),
+                            StandardOpenOption.APPEND);
                 }
 
             } catch (Exception e) {
@@ -609,4 +611,14 @@ public class iFixPlusPlugin extends TestPlugin {
         }
     }
 
+    int countDirNums(String path) {
+        File [] list = new File(path).listFiles();
+        int num = 0;
+        for (File file : list){
+            if (file.isDirectory()){
+                num ++;
+            }
+        }
+        return num;
+    }
 }
