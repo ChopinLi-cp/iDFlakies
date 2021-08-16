@@ -157,7 +157,7 @@ public class iFixPlusPlugin extends TestPlugin {
                 boolean doublevictim = false;
                 if(phase1Result.get().results().get(dtname+":1").result().toString().equals("PASS")) {
                     System.out.println("enter phase 2!!!");
-                    //phase 2: run doublevictim order state capture
+                    // phase 2: run doublevictim order state capture
                     write2tmp("2");
                     doublevictim = true;
                     Files.write(Paths.get(output),
@@ -167,10 +167,19 @@ public class iFixPlusPlugin extends TestPlugin {
                         runner.runList(victim());
                     }
                     catch (Exception e){
-                        System.out.println("error in phase 1: " + e);
+                        System.out.println("error in phase 2: " + e);
                     }
                 }
                 else {
+                    System.out.println("enter phase 2tmp!!!");
+                    //phase 2tmp: run doublevictim order state capture
+                    write2tmp("2tmp");
+                    try {
+                        runner.runList(victim());
+                    }
+                    catch (Exception e){
+                        System.out.println("error in phase 2tmp: " + e);
+                    }
                     System.out.println("enter phase 3!!!");
                     // phase 3: run passorder (indicated in the json) state capture;
                     write2tmp("3");
