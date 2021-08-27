@@ -224,7 +224,6 @@ public class iFixPlusPlugin extends TestPlugin {
                 write2tmp("4");
                 try {
                     runner.runList(testFailOrder());
-                    timing(startTime);
                 }
                 catch(Exception e) {
                     System.out.println("error in phase 4 before!! " + e);
@@ -250,6 +249,10 @@ public class iFixPlusPlugin extends TestPlugin {
                     timing(startTime);
                     startTime = System.currentTimeMillis();
                     System.out.println("finish phase 4 after!!");
+                } else {
+                    Files.write(Paths.get(output),
+                            "0,".getBytes(),
+                            StandardOpenOption.APPEND);
                 }
 
                 //System.out.println("FailOrder: " + testFailOrder());
