@@ -132,7 +132,12 @@ public class iFixPlusPlugin extends TestPlugin {
                     }
                 }
 
+                Files.write(Paths.get(output),
+                        (lastPolluter() + ",").getBytes(),
+                        StandardOpenOption.APPEND);
 
+                timing(startTime);
+                startTime = System.currentTimeMillis();
                 System.out.println("phase 0 ends");
 
                  //phase 1: run doublevictim order
@@ -152,6 +157,8 @@ public class iFixPlusPlugin extends TestPlugin {
                 catch(Exception e) {
                     System.out.println("error in phase 1: " + e);
                 }
+                timing(startTime);
+                startTime = System.currentTimeMillis();
                 System.out.println("finished phase 1!!");
 
                 boolean doublevictim = false;
@@ -160,15 +167,21 @@ public class iFixPlusPlugin extends TestPlugin {
                     // phase 2: run doublevictim order state capture
                     write2tmp("2");
                     doublevictim = true;
-                    Files.write(Paths.get(output),
-                            "doublevictim,".getBytes(),
-                            StandardOpenOption.APPEND);
+                    // Files.write(Paths.get(output),
+                    //         "doublevictim,".getBytes(),
+                    //         StandardOpenOption.APPEND);
                     try {
                         runner.runList(victim());
                     }
                     catch (Exception e){
                         System.out.println("error in phase 2: " + e);
                     }
+                    System.out.println("finished phase 2!!");
+                    timing(startTime);
+                    startTime = System.currentTimeMillis();
+                    Files.write(Paths.get(output),
+                            "0,".getBytes(),
+                            StandardOpenOption.APPEND);
                 }
                 else {
                     System.out.println("enter phase 2tmp!!!");
@@ -183,17 +196,24 @@ public class iFixPlusPlugin extends TestPlugin {
                     System.out.println("enter phase 3!!!");
                     // phase 3: run passorder (indicated in the json) state capture;
                     write2tmp("3");
-                    Files.write(Paths.get(output),
-                            "passorder,".getBytes(),
-                            StandardOpenOption.APPEND);
+                    // Files.write(Paths.get(output),
+                    //         "passorder,".getBytes(),
+                    //         StandardOpenOption.APPEND);
                     try{
                         runner.runList(testPassOrder_full());
                     }
                     catch(Exception e) {
                         System.out.println("error in running passing order!");
                     }
+
+                    Files.write(Paths.get(output),
+                            "0,".getBytes(),
+                            StandardOpenOption.APPEND);
+                    timing(startTime);
+                    startTime = System.currentTimeMillis();
                     System.out.println("finished passing order state capturing!!");
                     System.out.println("passOrder: " + testPassOrder_full());
+                    System.out.println("finished phase 3!!");
                 }
 
                 xmlFileNum = countDirNums(subxmlFold);
@@ -204,12 +224,15 @@ public class iFixPlusPlugin extends TestPlugin {
                 write2tmp("4");
                 try {
                     runner.runList(testFailOrder());
+                    timing(startTime);
                 }
                 catch(Exception e) {
                     System.out.println("error in phase 4 before!! " + e);
 
                 }
 
+                timing(startTime);
+                startTime = System.currentTimeMillis();
                 System.out.println("finish phase 4 before!!");
 
                 xmlFileNum = countDirNums(subxmlFold);
@@ -224,6 +247,8 @@ public class iFixPlusPlugin extends TestPlugin {
                         System.out.println("error in phase 4 after!! " + e);
 
                     }
+                    timing(startTime);
+                    startTime = System.currentTimeMillis();
                     System.out.println("finish phase 4 after!!");
                 }
 
@@ -262,6 +287,9 @@ public class iFixPlusPlugin extends TestPlugin {
                     System.out.println("cannot do diff, the number of xml files is not 2!!");
                 }
 
+                timing(startTime);
+                startTime = System.currentTimeMillis();
+
                 // output of phase 5
                 String diffFile = diffFieldsFold + "/0.txt";
 
@@ -287,12 +315,33 @@ public class iFixPlusPlugin extends TestPlugin {
                 String prefix = "diffFieldAfter " + lastPolluter() + " ";
                 boolean reflectAfterOneSuccess = reflectEachField(diffFile, reflectionFile, runner, prefix);
                 if(reflectAfterOneSuccess) {
-                    Files.write(Paths.get(output), "AfterOneSuccess,".getBytes(),
-                            StandardOpenOption.APPEND);
+                    // Files.write(Paths.get(output), "AfterOneSuccess,".getBytes(),
+                    //         StandardOpenOption.APPEND);
+                    String successfulField = "";
+                    try (BufferedReader br = new BufferedReader(new FileReader(reflectionFile))) {
+                        String line;
+                        while ((line = br.readLine()) != null) {
+                            if(line.contains(" made test success#######")) {
+                                successfulField = line.substring(8, line.lastIndexOf(" made test success#######"));
+                                break;
+                            }
+                        }
+                    }
+                    catch (Exception e) {
+                        return;
+                    }
+                    timing(startTime);
+                    if (!successfulField.equals("")) {
+                        Files.write(Paths.get(output), (successfulField + ",").getBytes(),
+                                StandardOpenOption.APPEND);
+                    } else {
+                        Files.write(Paths.get(output), "NotFound,".getBytes(),
+                                StandardOpenOption.APPEND);
+                    }
                 }
                 else {
                     // reflect fields using delta-debugging
-                    boolean reflectAfterSuccess = reflectFields(diffFile, reflectionFile, runner, prefix);
+                    /* boolean reflectAfterSuccess = reflectFields(diffFile, reflectionFile, runner, prefix);
                     if(reflectAfterSuccess) {
                         Files.write(Paths.get(output), "AfterSuccess,".getBytes(),
                                 StandardOpenOption.APPEND);
@@ -300,9 +349,12 @@ public class iFixPlusPlugin extends TestPlugin {
                     else {
                         Files.write(Paths.get(output), "AfterFail,".getBytes(),
                                 StandardOpenOption.APPEND);
-                    }
+                    } */
 
-                    Files.write(Paths.get(output), "AfterOneFail,".getBytes(),
+                    // Files.write(Paths.get(output), "AfterOneFail,".getBytes(),
+                    //         StandardOpenOption.APPEND);
+                    timing(startTime);
+                    Files.write(Paths.get(output), "NotFound,".getBytes(),
                             StandardOpenOption.APPEND);
                 }
 
@@ -312,7 +364,7 @@ public class iFixPlusPlugin extends TestPlugin {
         } else {
             TestPluginPlugin.mojo().getLog().info("Module is not using a supported test framework (probably not JUnit).");
         }
-        timing(startTime);
+        // timing(startTime);
     }
 
     private void timing(long startTime) {
