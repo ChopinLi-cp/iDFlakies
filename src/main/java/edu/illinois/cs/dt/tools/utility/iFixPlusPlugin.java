@@ -77,7 +77,7 @@ public class iFixPlusPlugin extends TestPlugin {
                 write2tmp("0");
                 if(testFailOrder()==null) {
                     Files.write(Paths.get(output),
-                            "wrongjsonfail,".getBytes(),
+                            "0,0,0,0,0,0,0,0,wrongjsonfail,".getBytes(),
                             StandardOpenOption.APPEND);
                     System.out.println("original json file wrong!!");
                     return;
@@ -85,7 +85,7 @@ public class iFixPlusPlugin extends TestPlugin {
 
                 if(testPassOrder_full()==null) {
                     Files.write(Paths.get(output),
-                            "wrongjsonpass,".getBytes(),
+                            "0,0,0,0,0,0,0,0,wrongjsonpass,".getBytes(),
                             StandardOpenOption.APPEND);
                     System.out.println("original json file wrong!!");
                     return;
@@ -106,7 +106,7 @@ public class iFixPlusPlugin extends TestPlugin {
                     if(phase0ResultFail.get().results().get(dtname).result().toString().equals("PASS")) {
                         System.out.println("json file wrong!!");
                         Files.write(Paths.get(output),
-                                "wrongjsonfail2,".getBytes(),
+                                "0,0,0,0,0,0,0,0,wrongjsonfail2,".getBytes(),
                                 StandardOpenOption.APPEND);
                         return;
                     }
@@ -126,7 +126,7 @@ public class iFixPlusPlugin extends TestPlugin {
                     if(!phase0ResultPass.get().results().get(dtname).result().toString().equals("PASS")) {
                         System.out.println("json file wrong!!");
                         Files.write(Paths.get(output),
-                                "wrongjsonpass2,".getBytes(),
+                                "0,0,0,0,0,0,0,0,wrongjsonpass2,".getBytes(),
                                 StandardOpenOption.APPEND);
                         return;
                     }
@@ -338,7 +338,7 @@ public class iFixPlusPlugin extends TestPlugin {
                         Files.write(Paths.get(output), (successfulField + ",").getBytes(),
                                 StandardOpenOption.APPEND);
                     } else {
-                        Files.write(Paths.get(output), "NotFound,".getBytes(),
+                        Files.write(Paths.get(output), "FAIL,".getBytes(),
                                 StandardOpenOption.APPEND);
                     }
                 }
@@ -357,7 +357,7 @@ public class iFixPlusPlugin extends TestPlugin {
                     // Files.write(Paths.get(output), "AfterOneFail,".getBytes(),
                     //         StandardOpenOption.APPEND);
                     timing(startTime);
-                    Files.write(Paths.get(output), "NotFound,".getBytes(),
+                    Files.write(Paths.get(output), "FAIL,".getBytes(),
                             StandardOpenOption.APPEND);
                 }
 
