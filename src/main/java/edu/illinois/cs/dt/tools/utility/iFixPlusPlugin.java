@@ -122,6 +122,9 @@ public class iFixPlusPlugin extends TestPlugin {
                 System.out.println("tests!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" +
                         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
+                Files.write(Paths.get(output),
+                        (lastPolluter() + ",").getBytes(),
+                        StandardOpenOption.APPEND);
                 // phase 0 check json file
                 System.out.println("phase 0 begin");
                 write2tmp("0");
@@ -185,10 +188,6 @@ public class iFixPlusPlugin extends TestPlugin {
                         return;
                     }
                 }
-
-                Files.write(Paths.get(output),
-                        (lastPolluter() + ",").getBytes(),
-                        StandardOpenOption.APPEND);
 
                 timing(startTime);
                 startTime = System.currentTimeMillis();
