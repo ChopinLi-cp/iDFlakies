@@ -5,9 +5,11 @@ import com.reedoei.eunomia.io.files.FileUtil;
 import edu.illinois.cs.diaper.StateCapture;
 import edu.illinois.cs.diaper.agent.MainAgent;
 import edu.illinois.cs.dt.tools.minimizer.PolluterData;
+import edu.illinois.cs.dt.tools.runner.InstrumentingSmartRunner;
 import edu.illinois.cs.dt.tools.runner.data.DependentTest;
 import edu.illinois.cs.dt.tools.runner.data.DependentTestList;
 import edu.illinois.cs.testrunner.configuration.Configuration;
+import edu.illinois.cs.testrunner.coreplugin.TestPluginUtil;
 import edu.illinois.cs.testrunner.data.results.TestRunResult;
 import edu.illinois.cs.testrunner.execution.JUnitTestExecutor;
 import edu.illinois.cs.testrunner.mavenplugin.TestPlugin;
@@ -45,7 +47,55 @@ public class iFixPlusPlugin extends TestPlugin {
     @Override
     public void execute(final MavenProject mavenProject) {
         long startTime = System.currentTimeMillis();
-        final Option<Runner> runnerOption = RunnerFactory.from(mavenProject);
+
+        // Currently there could two runners, one for JUnit 4 and one for JUnit 5
+        // If the maven project has both JUnit 4 and JUnit 5 tests, two runners will
+        // be returned
+        List<Runner> runners = RunnerFactory.allFrom(mavenProject);
+        //runners = removeZombieRunners(runners, project);
+
+        if (runners.size() != 1) {
+            // HACK: Always force JUnit 4
+            boolean forceJUnit4 = true;
+            if (forceJUnit4) {
+                Runner nrunner = null;
+                for (Runner runner : runners) {
+                    if (runner.framework().toString() == "JUnit") {
+                        nrunner = runner;
+                        break;
+                    }
+                }
+                if (nrunner != null) {
+                    runners = new ArrayList<>(Arrays.asList(nrunner));
+                } else {
+                    String errorMsg;
+                    if (runners.size() == 0) {
+                        errorMsg =
+                                "Module is not using a supported test framework (probably not JUnit), " +
+                                        "or there is no test.";
+                    } else {
+                        errorMsg = "dt.detector.forceJUnit4 is true but no JUnit 4 runners found. Perhaps the project only contains JUnit 5 tests.";
+                    }
+                    TestPluginPlugin.mojo().getLog().info(errorMsg);
+                    return;
+                }
+            } else {
+                String errorMsg;
+                if (runners.size() == 0) {
+                    errorMsg =
+                            "Module is not using a supported test framework (probably not JUnit), " +
+                                    "or there is no test.";
+                } else {
+                    // more than one runner, currently is not supported.
+                    errorMsg =
+                            "This project contains both JUnit 4 and JUnit 5 tests, which currently"
+                                    + " is not supported by iDFlakies";
+                }
+                TestPluginPlugin.mojo().getLog().info(errorMsg);
+                return;
+            }
+        }
+        final Runner runner = InstrumentingSmartRunner.fromRunner(runners.get(0));
 
         replayPath = Paths.get(Configuration.config().getProperty("replay.path"));
         replayPath2 = Paths.get(Configuration.config().getProperty("replay.path2"));
@@ -63,12 +113,12 @@ public class iFixPlusPlugin extends TestPlugin {
         int xmlFileNum = countDirNums(subxmlFold);
         System.out.println("xmlFileName: " + xmlFileNum);
 
-        if (runnerOption.isDefined() && module.equals(PathManager.modulePath().toString())) {
+        if (runner != null && module.equals(PathManager.modulePath().toString())) {
             System.out.println("replyPath: " + replayPath);
             System.out.println("module: " + module);
 
             try {
-                final Runner runner = runnerOption.get(); // safe because we checked above
+                // final Runner runner = runnerOption.get(); // safe because we checked above
                 System.out.println("tests!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" +
                         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
@@ -76,16 +126,18 @@ public class iFixPlusPlugin extends TestPlugin {
                 System.out.println("phase 0 begin");
                 write2tmp("0");
                 if(testFailOrder()==null) {
+                    timing(startTime);
                     Files.write(Paths.get(output),
-                            "0,0,0,0,0,0,0,0,wrongjsonfail,".getBytes(),
+                            "0,0,0,0,0,0,0,wrongjsonfail,".getBytes(),
                             StandardOpenOption.APPEND);
                     System.out.println("original json file wrong!!");
                     return;
                 }
 
                 if(testPassOrder_full()==null) {
+                    timing(startTime);
                     Files.write(Paths.get(output),
-                            "0,0,0,0,0,0,0,0,wrongjsonpass,".getBytes(),
+                            "0,0,0,0,0,0,0,wrongjsonpass,".getBytes(),
                             StandardOpenOption.APPEND);
                     System.out.println("original json file wrong!!");
                     return;
@@ -105,8 +157,9 @@ public class iFixPlusPlugin extends TestPlugin {
 
                     if(phase0ResultFail.get().results().get(dtname).result().toString().equals("PASS")) {
                         System.out.println("json file wrong!!");
+                        timing(startTime);
                         Files.write(Paths.get(output),
-                                "0,0,0,0,0,0,0,0,wrongjsonfail2,".getBytes(),
+                                "0,0,0,0,0,0,0,wrongjsonfail2,".getBytes(),
                                 StandardOpenOption.APPEND);
                         return;
                     }
@@ -125,8 +178,9 @@ public class iFixPlusPlugin extends TestPlugin {
 
                     if(!phase0ResultPass.get().results().get(dtname).result().toString().equals("PASS")) {
                         System.out.println("json file wrong!!");
+                        timing(startTime);
                         Files.write(Paths.get(output),
-                                "0,0,0,0,0,0,0,0,wrongjsonpass2,".getBytes(),
+                                "0,0,0,0,0,0,0,wrongjsonpass2,".getBytes(),
                                 StandardOpenOption.APPEND);
                         return;
                     }
