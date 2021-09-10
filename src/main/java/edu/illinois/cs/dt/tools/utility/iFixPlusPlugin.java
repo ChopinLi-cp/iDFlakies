@@ -146,7 +146,7 @@ public class iFixPlusPlugin extends TestPlugin {
                     return;
                 }
 
-                for(int i=0; i<1; i++) {
+                for(int i=0; i<10; i++) {
                     Try<TestRunResult> phase0ResultFail = null;
                     try{
                         phase0ResultFail = runner.runList(testFailOrder());
@@ -168,7 +168,7 @@ public class iFixPlusPlugin extends TestPlugin {
                     }
                 }
 
-                for(int i=0; i<1; i++) {
+                for(int i=0; i<10; i++) {
                     Try<TestRunResult> phase0ResultPass = null;
                     try{
                         phase0ResultPass = runner.runList(testPassOrder_full());
