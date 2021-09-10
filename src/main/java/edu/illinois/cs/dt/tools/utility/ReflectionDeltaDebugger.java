@@ -39,9 +39,7 @@ public class ReflectionDeltaDebugger extends DeltaDebugger<String> {
         try{
             write2tmp(s);
         } catch (FileNotFoundException fileNotFoundException){
-            System.out.println("WRTING EXCEPTION: fileNotFoundException.");
         } catch (UnsupportedEncodingException unsupportedEncodingException) {
-            System.out.println("WRTING EXCEPTION: unsupportedEncodingException.");
         }
         return result(failingOrder).toString().equals("PASS");
     }
