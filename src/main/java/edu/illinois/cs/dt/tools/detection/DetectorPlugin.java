@@ -40,10 +40,10 @@ import java.util.function.Predicate;
 public class DetectorPlugin extends TestPlugin {
     private final Path outputPath;
     private String coordinates;
-    private InstrumentingSmartRunner runner;
+    InstrumentingSmartRunner runner;
     private static Map<Integer, List<String>> locateTestList = new HashMap<>();
     // useful for modules with JUnit 4 tests but depend on something in JUnit 5
-    private final boolean forceJUnit4 = Configuration.config().getProperty("dt.detector.forceJUnit4", false);
+    final boolean forceJUnit4 = Configuration.config().getProperty("dt.detector.forceJUnit4", false);
 
     // Don't delete this.
     // This is actually used, provided you call this class via Maven (used by the testrunner plugin)
@@ -345,7 +345,24 @@ public class DetectorPlugin extends TestPlugin {
         }
     }
 
-    private static List<Runner> removeZombieRunners(
+    public static List<String> getTestClasses (
+            final ProjectWrapper project,
+            TestFramework testFramework) throws IOException {
+        List<String> tests = getOriginalOrder(project, testFramework);
+
+        String delimiter = testFramework.getDelimiter();
+        List<String> classes = new ArrayList<>();
+        for(String test : tests){
+            String clazz = test.substring(0, test.lastIndexOf(delimiter));
+            if(!classes.contains(clazz)) {
+                classes.add(clazz);
+            }
+        }
+
+        return classes;
+    }
+
+    static List<Runner> removeZombieRunners(
             List<Runner> runners, ProjectWrapper project) throws IOException {
         // Some projects may include test frameworks without corresponding tests.
         // Filter out such zombie test frameworks (runners).
