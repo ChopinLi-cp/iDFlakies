@@ -53,6 +53,19 @@ public class IncDetectorPlugin extends DetectorPlugin {
     protected DependencyFormat depFormat;
 
     /**
+     * Set this to "false" to not filter out "sun.*" and "java.*" classes from jdeps parsing.
+     */
+    @Parameter(property = "filterLib", defaultValue = TRUE)
+    protected boolean filterLib;
+
+    /**
+     * Path to directory that contains the result of running jdeps on third-party
+     * and standard library jars that an application may need, e.g., those in M2_REPO.
+     */
+    @Parameter(property = "gCache", defaultValue = "${basedir}${file.separator}jdeps-cache")
+    protected String graphCache;
+
+    /**
      * Output filename for the graph, if printGraph == true.
      */
     @Parameter(defaultValue = "graph", readonly = true, required = true)
@@ -114,7 +127,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> allTests = new HashSet<>(getTestClasses(project, this.runner.framework()));
         Set<String> affectedTests = new HashSet<>(allTests);
         Pair<Set<String>, Set<String>> data = computeChangeData(false);
+        System.out.println("CHANGEDATA: " + data);
         Set<String> nonAffectedTests = data == null ? new HashSet<String>() : data.getKey();
+        System.out.println("NONAFFECTEDTESTS: " + nonAffectedTests.size() + " " + nonAffectedTests);
         affectedTests.removeAll(nonAffectedTests);
         if (allTests.equals(nonAffectedTests)) {
             Logger.getGlobal().log(Level.INFO, STARS_RUN_STARS);
@@ -167,8 +182,11 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Files.createDirectories(DetectorPathManager.detectionResults());
 
         artifactsDir = getArtifactsDir();
+        cleanBytes = true;
         depFormat = DependencyFormat.ZLC;
+        filterLib = true;
         graphFile = "graph";
+        graphCache = "jdeps-cache";
         printGraph = true;
         updateChecksums = true;
         useThirdParty = false;
@@ -327,8 +345,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     public Loadables prepareForNextRun(String sfPathString, Classpath sfClassPath, List<String> classesToAnalyze,
                                              Set<String> nonAffected, boolean computeUnreached) {
-        boolean filterLib = true;
-        String graphCache = "jdeps-cache";
         File jdepsCache = new File(graphCache);
         String m2Repo = "tmp"; // getLocalRepository().getBasedir(); // AbstractSurefireMojo
 
@@ -353,8 +369,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
     }
 
     public void printToTerminal(List<String> testClasses, Set<String> affectedTests) {
-        Logger.getGlobal().log(Level.INFO, STARTS_AFFECTED_TESTS + affectedTests.size());
-        Logger.getGlobal().log(Level.INFO, "STARTS:TotalTests: " + testClasses.size());
+        Logger.getGlobal().log(Level.INFO, STARTS_AFFECTED_TESTS + affectedTests.size() + affectedTests);
+        Logger.getGlobal().log(Level.INFO, "STARTS:TotalTests: " + testClasses.size() + testClasses);
     }
 
     public void save(String artifactsDir, Set<String> affectedTests, List<String> testClasses,
@@ -373,14 +389,14 @@ public class IncDetectorPlugin extends DetectorPlugin {
     public void updateForNextRun(final ProjectWrapper project, Set<String> nonAffected) throws IOException, MojoExecutionException {
         long start = System.currentTimeMillis();
 
+        Classpath sfClassPath = getSureFireClassPath(project);
+        String sfPathString = Writer.pathToString(sfClassPath.getClassPath());
+
         /* try {
             setIncludesExcludes();
         } catch (MojoExecutionException e) {
             e.printStackTrace();
         } */
-
-        Classpath sfClassPath = getSureFireClassPath(project);
-        String sfPathString = Writer.pathToString(sfClassPath.getClassPath());
 
         List<String> allTests = getTestClasses(project, this.runner.framework());  // may contain IO Exception
         List<String> classesToAnalyze = allTests;
