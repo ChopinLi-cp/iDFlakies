@@ -4,6 +4,7 @@ import edu.illinois.cs.dt.tools.runner.InstrumentingSmartRunner;
 import edu.illinois.cs.dt.tools.utility.ErrorLogger;
 import edu.illinois.cs.dt.tools.utility.PathManager;
 import edu.illinois.cs.testrunner.coreplugin.TestPluginUtil;
+import edu.illinois.cs.testrunner.data.framework.TestFramework;
 import edu.illinois.cs.testrunner.runner.Runner;
 import edu.illinois.cs.testrunner.runner.RunnerFactory;
 import edu.illinois.cs.testrunner.util.ProjectWrapper;
@@ -22,6 +23,8 @@ import org.apache.maven.surefire.booter.SurefireExecutionException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.logging.Level;
@@ -102,6 +105,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
     @Parameter(property = "zlcFormat", defaultValue = "PLAIN_TEXT")
     protected ZLCFormat zlcFormat;
 
+    private Set<String> affectedTestClasses;
+
     @Override
     public void execute(final ProjectWrapper project) {
         final ErrorLogger logger = new ErrorLogger(project);
@@ -109,20 +114,23 @@ public class IncDetectorPlugin extends DetectorPlugin {
         if(this.runner == null) {
             return;
         }
+        this.coordinates = logger.coordinates();
 
         try {
-            computeAffectedTests(project);
+            affectedTestClasses = computeAffectedTests(project);
         } catch (IOException e) {
             e.printStackTrace();
         } catch (MojoExecutionException e) {
             e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
         }
 
-        // logger.runAndLogError(() -> incDetectorExecute(logger, project));
+        logger.runAndLogError(() -> detectorExecute(logger, project, moduleRounds(coordinates)));
     }
 
     // from SelectMojo
-    private Set<String> computeAffectedTests(ProjectWrapper project) throws IOException, MojoExecutionException {
+    private Set<String> computeAffectedTests(ProjectWrapper project) throws IOException, MojoExecutionException, ClassNotFoundException {
         // setIncludesExcludes();
         Set<String> allTests = new HashSet<>(getTestClasses(project, this.runner.framework()));
         Set<String> affectedTests = new HashSet<>(allTests);
@@ -136,11 +144,54 @@ public class IncDetectorPlugin extends DetectorPlugin {
             Logger.getGlobal().log(Level.INFO, NO_TESTS_ARE_SELECTED_TO_RUN);
         }
         long startUpdate = System.currentTimeMillis();
-        if (updateChecksums) {
-            updateForNextRun(project, nonAffectedTests);
-        }
+        Loadables loadables = updateForNextRun(project, nonAffectedTests);
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
+
+        if (loadables == null) {
+            return affectedTests;
+        }
+
+        Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
+
+        Map<String, Set<String>> reverseTransitiveClosure = getReverseClosure(transitiveClosure);
+
+        Classpath sfClassPath = getSureFireClassPath(project);
+        ClassLoader loader = createClassLoader(sfClassPath);
+
+        Set<String> additionalTests = new HashSet<>();
+
+        // iter through the affected tests and find what depends on
+        for (String affectedTest : affectedTests) {
+            Set<String> dependencies = transitiveClosure.get(affectedTest);
+            for (String dependency : dependencies) {
+                System.out.println("DEPENDENCY: " + dependency);
+                Class clazz = loader.loadClass(dependency);
+
+                Field[] declaredFields = clazz.getDeclaredFields();
+                Set<Field> allFields = new HashSet<Field>();
+                allFields.addAll(Arrays.asList(declaredFields));
+
+                for (Field field : allFields) {
+                    if (Modifier.isStatic(field.getModifiers())) {
+                        String upperLevelAffectedClass = clazz.getName();
+                        System.out.println("upperLevelAffectedClass: " + upperLevelAffectedClass);
+                        System.out.println("transitiveClosure: " + transitiveClosure);
+                        System.out.println("reverseTransitiveClosure: " + reverseTransitiveClosure);
+                        Set<String> upperLevelAffectedTestClasses = reverseTransitiveClosure.get(upperLevelAffectedClass);
+                        if (upperLevelAffectedTestClasses != null) {
+                            additionalTests.addAll(upperLevelAffectedTestClasses);
+                        }
+                        break;
+                    }
+                }
+
+                System.out.println("NO ClassNotFoundException When loading class: " + dependency);
+            }
+        }
+
+        affectedTests.addAll(additionalTests);
+
         return affectedTests;
     }
 
@@ -176,10 +227,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
         return loader;
     }
 
-    public Void defineSettings(final ErrorLogger logger, final ProjectWrapper project) throws IOException {
-        Files.deleteIfExists(DetectorPathManager.errorPath());
-        Files.createDirectories(DetectorPathManager.cachePath());
-        Files.createDirectories(DetectorPathManager.detectionResults());
+    @Override
+    protected Void defineSettings(final ErrorLogger logger, final ProjectWrapper project) throws IOException {
+        super.defineSettings(logger, project);
 
         artifactsDir = getArtifactsDir();
         cleanBytes = true;
@@ -192,7 +242,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
         useThirdParty = false;
         zlcFormat = ZLCFormat.PLAIN_TEXT;
 
-        loadTestRunners(logger, project); // may contain IO Exception
         return null;
     }
 
@@ -205,6 +254,25 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
         return artifactsDir;
+    }
+
+    public Map<String, Set<String>> getReverseClosure(Map<String, Set<String>> transitiveClosure) {
+        Map<String, Set<String>> reverseTransitiveClosure = new HashMap<>();
+        for (Map.Entry<String, Set<String>> entry : transitiveClosure.entrySet()) {
+            for (String dep : entry.getValue()) {
+                Set<String> reverseDeps = new HashSet<>();
+                if (reverseTransitiveClosure.containsKey(dep)) {
+                    reverseDeps = reverseTransitiveClosure.get(dep);
+                    reverseDeps.add(entry.getKey());
+                    reverseTransitiveClosure.replace(dep, reverseDeps);
+                }
+                else {
+                    reverseDeps.add(entry.getKey());
+                    reverseTransitiveClosure.putIfAbsent(dep, reverseDeps);
+                }
+            }
+        }
+        return reverseTransitiveClosure;
     }
 
     public Classpath getSureFireClassPath(final ProjectWrapper project) {
@@ -220,127 +288,21 @@ public class IncDetectorPlugin extends DetectorPlugin {
         return sureFireClassPath;
     }
 
-    public Void incDetectorExecute(final ErrorLogger logger, final ProjectWrapper project) throws IOException {
-        Files.deleteIfExists(DetectorPathManager.errorPath());
-        Files.createDirectories(DetectorPathManager.cachePath());
-        Files.createDirectories(DetectorPathManager.detectionResults());
+    @Override
+    protected List<String> getTests(
+            final ProjectWrapper project,
+            TestFramework testFramework) throws IOException {
+        List<String> tests = getOriginalOrder(project, testFramework);
+        List<String> affectedTests = new ArrayList<>();
 
-        loadTestRunners(logger, project); // may contain IO Exception
-        if(this.runner == null) {
-            return null;
-        }
-
-        /* try {
-            setIncludesExcludes();
-        } catch (MojoExecutionException e) {
-            e.printStackTrace();
-        } */
-
-        List<String> classesToAnalyze = null;
-        classesToAnalyze = getTestClasses(project, this.runner.framework()); // may contain IO Exception
-
-        String artifactsDir = getArtifactsDir();
-
-        Classpath sfClassPath = null;
-        sfClassPath = getSureFireClassPath(project);
-        String sfPathString = Writer.pathToString(sfClassPath.getClassPath());
-
-        useThirdParty = false;
-        boolean filterLib = true;
-        boolean computeUnreached = true;
-
-        String m2Repo = "tmp"; // getLocalRepository().getBasedir(); // AbstractSurefireMojo
-        String graphCache = "jdeps-cache";
-        File jdepsCache = new File(graphCache);
-
-        // Create the Loadables object early so we can use its helpers
-        Loadables loadables = new Loadables(classesToAnalyze, artifactsDir, sfPathString,
-                useThirdParty, filterLib, jdepsCache);
-        // Surefire Classpath object is easier to iterate over without de-constructing
-        // sfPathString (which we use in a number of other places)
-        loadables.setSurefireClasspath(sfClassPath);
-
-        Cache cache = new Cache(jdepsCache, m2Repo);
-        // 1. Load non-reflection edges from third-party libraries in the classpath
-        List<String> moreEdges = new ArrayList<>();
-        if (useThirdParty) {
-            moreEdges = cache.loadM2EdgesFromCache(sfPathString);
-        }
-
-        // 2. Get non-reflection edges from CUT and SDK; use (1) to build graph
-        loadables.create(new ArrayList<>(moreEdges), sfClassPath, computeUnreached);
-
-        Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
-        Map<String, Set<String>> testDeps = transitiveClosure;
-        ClassLoader loader = createClassLoader(sfClassPath);
-        Set<String> unreached = loadables.getUnreached();
-        depFormat = DependencyFormat.ZLC;
-        zlcFormat = ZLCFormat.PLAIN_TEXT;
-
-        if (depFormat == DependencyFormat.ZLC) {
-            ZLCHelper zlcHelper = new ZLCHelper();
-            try {
-                zlcHelper.updateZLCFile(testDeps, loader, artifactsDir, unreached, useThirdParty, zlcFormat);
-            } catch (NullPointerException n) {
-                n.printStackTrace();
+        String delimiter = testFramework.getDelimiter();
+        for (String test: tests) {
+            String clazz = test.substring(0, test.lastIndexOf(delimiter));
+            if (affectedTestClasses.contains(clazz)) {
+                affectedTests.add(test);
             }
         }
-
-        return null;
-    }
-
-    private void loadTestRunners(final ErrorLogger logger, final ProjectWrapper project) throws IOException {
-        // Currently there could two runners, one for JUnit 4 and one for JUnit 5
-        // If the maven project has both JUnit 4 and JUnit 5 tests, two runners will
-        // be returned
-        List<Runner> runners = RunnerFactory.allFrom(project);
-        runners = removeZombieRunners(runners, project);
-
-        if (runners.size() != 1) {
-            if (forceJUnit4) {
-                Runner nrunner = null;
-                for (Runner runner : runners) {
-                    if (runner.framework().toString() == "JUnit") {
-                        nrunner = runner;
-                        break;
-                    }
-                }
-                if (nrunner != null) {
-                    runners = new ArrayList<>(Arrays.asList(nrunner));
-                } else {
-                    String errorMsg;
-                    if (runners.size() == 0) {
-                        errorMsg =
-                                "Module is not using a supported test framework (probably not JUnit), " +
-                                        "or there is no test.";
-                    } else {
-                        errorMsg = "dt.detector.forceJUnit4 is true but no JUnit 4 runners found. Perhaps the project only contains JUnit 5 tests.";
-                    }
-                    TestPluginUtil.project.info(errorMsg);
-                    logger.writeError(errorMsg);
-                    return;
-                }
-            } else {
-                String errorMsg;
-                if (runners.size() == 0) {
-                    errorMsg =
-                            "Module is not using a supported test framework (probably not JUnit), " +
-                                    "or there is no test.";
-                } else {
-                    // more than one runner, currently is not supported.
-                    errorMsg =
-                            "This project contains both JUnit 4 and JUnit 5 tests, which currently"
-                                    + " is not supported by iDFlakies";
-                }
-                TestPluginUtil.project.info(errorMsg);
-                logger.writeError(errorMsg);
-                return;
-            }
-        }
-
-        if (this.runner == null) {
-            this.runner = InstrumentingSmartRunner.fromRunner(runners.get(0));
-        }
+        return affectedTests;
     }
 
     public Loadables prepareForNextRun(String sfPathString, Classpath sfClassPath, List<String> classesToAnalyze,
@@ -386,7 +348,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         }
     }
 
-    public void updateForNextRun(final ProjectWrapper project, Set<String> nonAffected) throws IOException, MojoExecutionException {
+    public Loadables updateForNextRun(final ProjectWrapper project, Set<String> nonAffected) throws IOException, MojoExecutionException {
         long start = System.currentTimeMillis();
 
         Classpath sfClassPath = getSureFireClassPath(project);
@@ -403,12 +365,13 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> affectedTests = new HashSet<>(allTests);
         affectedTests.removeAll(nonAffected);
         DirectedGraph<String> graph = null;
+        Loadables loadables = null;
 
         if (!affectedTests.isEmpty()) {
             ClassLoader loader = createClassLoader(sfClassPath);
             //TODO: set this boolean to true only for static reflectionAnalyses with * (border, string, naive)?
             boolean computeUnreached = true;
-            Loadables loadables = prepareForNextRun(sfPathString, sfClassPath, allTests, nonAffected, computeUnreached);
+            loadables = prepareForNextRun(sfPathString, sfClassPath, allTests, nonAffected, computeUnreached);
             Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
             Map<String, Set<String>> testDeps = transitiveClosure;
             graph = loadables.getGraph();
@@ -434,6 +397,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
         printToTerminal(allTests, affectedTests);
         long end = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_UPDATE_FOR_NEXT_RUN_TOTAL + Writer.millsToSeconds(end - start));
+
+        return loadables;
     }
 
 }
