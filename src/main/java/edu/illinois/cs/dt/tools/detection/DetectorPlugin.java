@@ -362,23 +362,6 @@ public class DetectorPlugin extends TestPlugin {
         }
     }
 
-    public static List<String> getTestClasses (
-            final ProjectWrapper project,
-            TestFramework testFramework) throws IOException {
-        List<String> tests = getOriginalOrder(project, testFramework);
-
-        String delimiter = testFramework.getDelimiter();
-        List<String> classes = new ArrayList<>();
-        for(String test : tests){
-            String clazz = test.substring(0, test.lastIndexOf(delimiter));
-            if(!classes.contains(clazz)) {
-                classes.add(clazz);
-            }
-        }
-
-        return classes;
-    }
-
     static List<Runner> removeZombieRunners(
             List<Runner> runners, ProjectWrapper project) throws IOException {
         // Some projects may include test frameworks without corresponding tests.

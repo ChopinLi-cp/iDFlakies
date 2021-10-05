@@ -3,6 +3,7 @@ package edu.illinois.cs.dt.tools.detection;
 import edu.illinois.cs.dt.tools.runner.InstrumentingSmartRunner;
 import edu.illinois.cs.dt.tools.utility.ErrorLogger;
 import edu.illinois.cs.dt.tools.utility.PathManager;
+import edu.illinois.cs.testrunner.configuration.Configuration;
 import edu.illinois.cs.testrunner.coreplugin.TestPluginUtil;
 import edu.illinois.cs.testrunner.data.framework.TestFramework;
 import edu.illinois.cs.testrunner.runner.Runner;
@@ -105,6 +106,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
     @Parameter(property = "zlcFormat", defaultValue = "PLAIN_TEXT")
     protected ZLCFormat zlcFormat;
 
+    protected boolean selectMore;
+
     private Set<String> affectedTestClasses;
 
     @Override
@@ -147,8 +150,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Loadables loadables = updateForNextRun(project, nonAffectedTests);
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
-
-        if (loadables == null) {
+        if (!selectMore || loadables == null) {
             return affectedTests;
         }
 
@@ -162,22 +164,19 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> additionalTests = new HashSet<>();
 
         // iter through the affected tests and find what depends on
+        Set<String> processedClasses = new HashSet<>();
         for (String affectedTest : affectedTests) {
             Set<String> dependencies = transitiveClosure.get(affectedTest);
             for (String dependency : dependencies) {
-                System.out.println("DEPENDENCY: " + dependency);
+                if (processedClasses.contains(dependency)) {
+                    continue;
+                }
+                processedClasses.add(dependency);
                 Class clazz = loader.loadClass(dependency);
 
-                Field[] declaredFields = clazz.getDeclaredFields();
-                Set<Field> allFields = new HashSet<Field>();
-                allFields.addAll(Arrays.asList(declaredFields));
-
-                for (Field field : allFields) {
+                for (Field field : clazz.getDeclaredFields()) {
                     if (Modifier.isStatic(field.getModifiers())) {
                         String upperLevelAffectedClass = clazz.getName();
-                        System.out.println("upperLevelAffectedClass: " + upperLevelAffectedClass);
-                        System.out.println("transitiveClosure: " + transitiveClosure);
-                        System.out.println("reverseTransitiveClosure: " + reverseTransitiveClosure);
                         Set<String> upperLevelAffectedTestClasses = reverseTransitiveClosure.get(upperLevelAffectedClass);
                         if (upperLevelAffectedTestClasses != null) {
                             additionalTests.addAll(upperLevelAffectedTestClasses);
@@ -185,8 +184,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
                         break;
                     }
                 }
-
-                System.out.println("NO ClassNotFoundException When loading class: " + dependency);
             }
         }
 
@@ -241,6 +238,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         updateChecksums = true;
         useThirdParty = false;
         zlcFormat = ZLCFormat.PLAIN_TEXT;
+        selectMore = Configuration.config().getProperty("dt.incdetector.selectmore", true);
 
         return null;
     }
@@ -292,7 +290,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
     protected List<String> getTests(
             final ProjectWrapper project,
             TestFramework testFramework) throws IOException {
-        List<String> tests = getOriginalOrder(project, testFramework);
+        List<String> tests = getOriginalOrder(project, testFramework, true);
         List<String> affectedTests = new ArrayList<>();
 
         String delimiter = testFramework.getDelimiter();
@@ -305,6 +303,23 @@ public class IncDetectorPlugin extends DetectorPlugin {
         return affectedTests;
     }
 
+    public static List<String> getTestClasses (
+            final ProjectWrapper project,
+            TestFramework testFramework) throws IOException {
+        List<String> tests = getOriginalOrder(project, testFramework, true);
+
+        String delimiter = testFramework.getDelimiter();
+        List<String> classes = new ArrayList<>();
+        for(String test : tests){
+            String clazz = test.substring(0, test.lastIndexOf(delimiter));
+            if(!classes.contains(clazz)) {
+                classes.add(clazz);
+            }
+        }
+
+        return classes;
+    }
+    
     public Loadables prepareForNextRun(String sfPathString, Classpath sfClassPath, List<String> classesToAnalyze,
                                              Set<String> nonAffected, boolean computeUnreached) {
         File jdepsCache = new File(graphCache);

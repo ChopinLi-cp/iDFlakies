@@ -1,8 +1,8 @@
 #!/bin/bash
 
 ARTIFACT_ID="idflakies"
-ARTIFACT_VERSION="1.1.0"
-CONFIGURATION_CLASS="edu.illinois.cs.dt.tools.detection.DetectorPlugin"
+ARTIFACT_VERSION="1.2.0-SNAPSHOT"
+CONFIGURATION_CLASS="edu.illinois.cs.dt.tools.detection.IncDetectorPlugin"
 
 if [[ $1 == "" ]]; then
     echo "arg1 - the path to the project, where high-level pom.xml is"
