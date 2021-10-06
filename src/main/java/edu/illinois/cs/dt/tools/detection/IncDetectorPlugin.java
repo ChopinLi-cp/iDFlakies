@@ -39,6 +39,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
      */
     protected String artifactsDir;
 
+    protected ClassLoader loader;
+
     /**
      * Set this to "false" to disable smart hashing, i.e., to *not* strip
      * Bytecode files of debug info prior to computing checksums. See the "Smart
@@ -108,6 +110,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     protected boolean selectMore;
 
+    protected boolean detectOrNot;
+
     private Set<String> affectedTestClasses;
 
     @Override
@@ -121,6 +125,10 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
         try {
             affectedTestClasses = computeAffectedTests(project);
+            if (!detectOrNot) {
+                System.out.println("Not detect flaky tests at the first run");
+                return;
+            }
         } catch (IOException e) {
             e.printStackTrace();
         } catch (MojoExecutionException e) {
@@ -157,9 +165,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
 
         Map<String, Set<String>> reverseTransitiveClosure = getReverseClosure(transitiveClosure);
-
-        Classpath sfClassPath = getSureFireClassPath(project);
-        ClassLoader loader = createClassLoader(sfClassPath);
 
         Set<String> additionalTests = new HashSet<>();
 
@@ -239,6 +244,11 @@ public class IncDetectorPlugin extends DetectorPlugin {
         useThirdParty = false;
         zlcFormat = ZLCFormat.PLAIN_TEXT;
         selectMore = Configuration.config().getProperty("dt.incdetector.selectmore", true);
+        detectOrNot = Configuration.config().getProperty("dt.incdetector.detectornot", true);
+
+        getSureFireClassPath(project);
+        loader = createClassLoader(sureFireClassPath);
+
 
         return null;
     }
@@ -366,8 +376,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
     public Loadables updateForNextRun(final ProjectWrapper project, Set<String> nonAffected) throws IOException, MojoExecutionException {
         long start = System.currentTimeMillis();
 
-        Classpath sfClassPath = getSureFireClassPath(project);
-        String sfPathString = Writer.pathToString(sfClassPath.getClassPath());
+        String sfPathString = Writer.pathToString(sureFireClassPath.getClassPath());
 
         /* try {
             setIncludesExcludes();
@@ -383,10 +392,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Loadables loadables = null;
 
         if (!affectedTests.isEmpty()) {
-            ClassLoader loader = createClassLoader(sfClassPath);
             //TODO: set this boolean to true only for static reflectionAnalyses with * (border, string, naive)?
             boolean computeUnreached = true;
-            loadables = prepareForNextRun(sfPathString, sfClassPath, allTests, nonAffected, computeUnreached);
+            loadables = prepareForNextRun(sfPathString, sureFireClassPath, allTests, nonAffected, computeUnreached);
             Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
             Map<String, Set<String>> testDeps = transitiveClosure;
             graph = loadables.getGraph();

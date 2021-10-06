@@ -56,10 +56,16 @@ public class RebuildDetectionRounds extends StandardMain {
 
             final Path testRuns = resultsFolder.resolve(RunnerPathManager.TEST_RUNS);
             final Path originalOrderPath = resultsFolder.resolve(DetectorPathManager.ORIGINAL_ORDER);
+            final Path selectTestsPath = resultsFolder.resolve(DetectorPathManager.SELECTED_TESTS);
             final Path detectionResults = resultsFolder.resolve(DetectorPathManager.DETECTION_RESULTS);
 
             if (!Files.exists(originalOrderPath)) {
                 System.out.println("No original order found at: " + originalOrderPath);
+                continue;
+            }
+
+            if (!Files.exists(selectTestsPath)) {
+                System.out.println("No selected tests found at: " + selectTestsPath);
                 continue;
             }
 

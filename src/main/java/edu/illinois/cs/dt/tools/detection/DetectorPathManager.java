@@ -9,6 +9,7 @@ public class DetectorPathManager extends PathManager {
     public static final Path DETECTION_RESULTS = Paths.get("detection-results");
     public static final Path FLAKY_LIST_PATH = Paths.get("flaky-lists.json");
     public static final Path ORIGINAL_ORDER = Paths.get("original-order");
+    public static final Path SELECTED_TESTS = Paths.get("selected-tests");
     public static final Path ERROR = Paths.get("error");
     public static final Path ORIGINAL_RESULTS_LOG = Paths.get("original-results-ids");
     public static final Path MVN_TEST_LOG = Paths.get("mvn-test.log");
@@ -41,6 +42,8 @@ public class DetectorPathManager extends PathManager {
     public static Path originalOrderPath() {
         return path(ORIGINAL_ORDER);
     }
+
+    public static Path selectedTestPath() { return path(SELECTED_TESTS); }
 
     public static Path errorPath() {
         return path(ERROR);
