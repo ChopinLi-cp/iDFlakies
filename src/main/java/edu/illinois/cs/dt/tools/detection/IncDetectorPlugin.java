@@ -13,6 +13,7 @@ import edu.illinois.starts.constants.StartsConstants;
 import edu.illinois.starts.data.ZLCFormat;
 import edu.illinois.starts.enums.DependencyFormat;
 import edu.illinois.starts.helpers.*;
+import edu.illinois.starts.maven.AgentLoader;
 import edu.illinois.starts.util.Logger;
 import edu.illinois.starts.util.Pair;
 import edu.illinois.yasgl.DirectedGraph;
@@ -27,6 +28,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.logging.Level;
 
@@ -77,6 +79,10 @@ public class IncDetectorPlugin extends DetectorPlugin {
     @Parameter(defaultValue = "graph", readonly = true, required = true)
     protected String graphFile;
 
+    protected List<Pair> jarCheckSums = null;
+
+    protected Set<String> nonAffectedTests;
+
     /**
      * Set this to "false" to not print the graph obtained from jdeps parsing.
      * When "true" the graph is written to file after the run.
@@ -86,6 +92,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     private Classpath sureFireClassPath;
 
+    private static final String TARGET = "target";
     /**
      * Set this to "false" to not add jdeps edges from 3rd party-libraries.
      */
@@ -142,13 +149,31 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     // from SelectMojo
     private Set<String> computeAffectedTests(ProjectWrapper project) throws IOException, MojoExecutionException, ClassNotFoundException {
+        String cpString = Writer.pathToString(sureFireClassPath.getClassPath());
+        List<String> sfPathElements = getCleanClassPath(cpString);
+
         // setIncludesExcludes();
         Set<String> allTests = new HashSet<>(getTestClasses(project, this.runner.framework()));
         Set<String> affectedTests = new HashSet<>(allTests);
+
+        if (!isSameClassPath(sfPathElements) || !hasSameJarChecksum(sfPathElements)) {
+            // Force retestAll because classpath changed since last run
+            // don't compute changed and non-affected classes
+            dynamicallyUpdateExcludes(new ArrayList<String>());
+            // Make nonAffected empty so dependencies can be updated
+            nonAffectedTests = new HashSet<>();
+            Writer.writeClassPath(cpString, artifactsDir);
+            Writer.writeJarChecksums(sfPathElements, artifactsDir, jarCheckSums);
+            return affectedTests;
+        }
+
+        nonAffectedTests = new HashSet<>();
         Pair<Set<String>, Set<String>> data = computeChangeData(false);
         System.out.println("CHANGEDATA: " + data);
-        Set<String> nonAffectedTests = data == null ? new HashSet<String>() : data.getKey();
+        nonAffectedTests = data == null ? new HashSet<String>() : data.getKey();
         System.out.println("NONAFFECTEDTESTS: " + nonAffectedTests.size() + " " + nonAffectedTests);
+        List<String> excludePaths = Writer.fqnsToExcludePath(nonAffectedTests);
+        dynamicallyUpdateExcludes(excludePaths);
         affectedTests.removeAll(nonAffectedTests);
         if (allTests.equals(nonAffectedTests)) {
             Logger.getGlobal().log(Level.INFO, STARS_RUN_STARS);
@@ -177,18 +202,24 @@ public class IncDetectorPlugin extends DetectorPlugin {
                     continue;
                 }
                 processedClasses.add(dependency);
-                Class clazz = loader.loadClass(dependency);
-
-                for (Field field : clazz.getDeclaredFields()) {
-                    if (Modifier.isStatic(field.getModifiers())) {
-                        String upperLevelAffectedClass = clazz.getName();
-                        Set<String> upperLevelAffectedTestClasses = reverseTransitiveClosure.get(upperLevelAffectedClass);
-                        if (upperLevelAffectedTestClasses != null) {
-                            additionalTests.addAll(upperLevelAffectedTestClasses);
+                try {
+                    Class clazz = loader.loadClass(dependency);
+                    for (Field field : clazz.getDeclaredFields()) {
+                        if (Modifier.isStatic(field.getModifiers())) {
+                            String upperLevelAffectedClass = clazz.getName();
+                            Set<String> upperLevelAffectedTestClasses = reverseTransitiveClosure.get(upperLevelAffectedClass);
+                            if (upperLevelAffectedTestClasses != null) {
+                                additionalTests.addAll(upperLevelAffectedTestClasses);
+                            }
+                            break;
                         }
-                        break;
                     }
+                } catch (ClassNotFoundException CNFE)  {
+                    System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                } catch (NoClassDefFoundError NCDFE)  {
+                    System.out.println("Can not load class. Test dependency skipping: " + dependency);
                 }
+
             }
         }
 
@@ -253,6 +284,14 @@ public class IncDetectorPlugin extends DetectorPlugin {
         return null;
     }
 
+    private void dynamicallyUpdateExcludes(List<String> excludePaths) throws MojoExecutionException {
+        if (AgentLoader.loadDynamicAgent()) {
+            System.setProperty(STARTS_EXCLUDE_PROPERTY, Arrays.toString(excludePaths.toArray(new String[0])));
+        } else {
+            throw new MojoExecutionException("I COULD NOT ATTACH THE AGENT");
+        }
+    }
+
     public String getArtifactsDir() throws FileNotFoundException {
         if (artifactsDir == null) {
             artifactsDir = PathManager.cachePath().toString();
@@ -262,6 +301,21 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
         return artifactsDir;
+    }
+
+    private List<String> getCleanClassPath(String cp) {
+        List<String> cpPaths = new ArrayList<>();
+        String[] paths = cp.split(File.pathSeparator);
+        String classes = File.separator + TARGET +  File.separator + CLASSES;
+        String testClasses = File.separator + TARGET + File.separator + TEST_CLASSES;
+        for (int i = 0; i < paths.length; i++) {
+            // TODO: should we also exclude SNAPSHOTS from same project?
+            if (paths[i].contains(classes) || paths[i].contains(testClasses)) {
+                continue;
+            }
+            cpPaths.add(paths[i]);
+        }
+        return cpPaths;
     }
 
     public Map<String, Set<String>> getReverseClosure(Map<String, Set<String>> transitiveClosure) {
@@ -329,7 +383,64 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
         return classes;
     }
-    
+
+    private boolean hasSameJarChecksum(List<String> cleanSfClassPath) throws FileNotFoundException, MojoExecutionException {
+        if (cleanSfClassPath.isEmpty()) {
+            return true;
+        }
+        String oldChecksumPathFileName = Paths.get(getArtifactsDir(), JAR_CHECKSUMS).toString();
+        if (!new File(oldChecksumPathFileName).exists()) {
+            return false;
+        }
+        boolean noException = true;
+        try {
+            List<String> lines = Files.readAllLines(Paths.get(oldChecksumPathFileName));
+            Map<String, String> checksumMap = new HashMap<>();
+            for (String line : lines) {
+                String[] elems = line.split(COMMA);
+                checksumMap.put(elems[0], elems[1]);
+            }
+            jarCheckSums = new ArrayList<>();
+            for (String path : cleanSfClassPath) {
+                Pair<String, String> pair = Writer.getJarToChecksumMapping(path);
+                jarCheckSums.add(pair);
+                String oldCS = checksumMap.get(pair.getKey());
+                noException &= pair.getValue().equals(oldCS);
+            }
+        } catch (IOException ioe) {
+            noException = false;
+            // reset to null because we don't know what/when exception happened
+            jarCheckSums = null;
+            ioe.printStackTrace();
+        }
+        return noException;
+    }
+
+    private boolean isSameClassPath(List<String> sfPathString) throws MojoExecutionException, FileNotFoundException {
+        if (sfPathString.isEmpty()) {
+            return true;
+        }
+        String oldSfPathFileName = Paths.get(getArtifactsDir(), SF_CLASSPATH).toString();
+        if (!new File(oldSfPathFileName).exists()) {
+            return false;
+        }
+        try {
+            List<String> oldClassPathLines = Files.readAllLines(Paths.get(oldSfPathFileName));
+            if (oldClassPathLines.size() != 1) {
+                throw new MojoExecutionException(SF_CLASSPATH + " is corrupt! Expected only 1 line.");
+                // This exception is not correct and need to be modified.
+            }
+            List<String> oldClassPathelements = getCleanClassPath(oldClassPathLines.get(0));
+            // comparing lists and not sets in case order changes
+            if (sfPathString.equals(oldClassPathelements)) {
+                return true;
+            }
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+        return false;
+    }
+
     public Loadables prepareForNextRun(String sfPathString, Classpath sfClassPath, List<String> classesToAnalyze,
                                              Set<String> nonAffected, boolean computeUnreached) {
         File jdepsCache = new File(graphCache);
