@@ -3,6 +3,7 @@ package edu.illinois.cs.dt.tools.detection;
 import edu.illinois.cs.dt.tools.runner.InstrumentingSmartRunner;
 import edu.illinois.cs.dt.tools.utility.ErrorLogger;
 import edu.illinois.cs.dt.tools.utility.PathManager;
+import edu.illinois.cs.dt.tools.utility.SootAnalysis;
 import edu.illinois.cs.testrunner.configuration.Configuration;
 import edu.illinois.cs.testrunner.coreplugin.TestPluginUtil;
 import edu.illinois.cs.testrunner.data.framework.TestFramework;
@@ -17,10 +18,16 @@ import edu.illinois.starts.maven.AgentLoader;
 import edu.illinois.starts.util.Logger;
 import edu.illinois.starts.util.Pair;
 import edu.illinois.yasgl.DirectedGraph;
+import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.surefire.AbstractSurefireMojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.MavenProject;
 import org.apache.maven.surefire.booter.Classpath;
 import org.apache.maven.surefire.booter.SurefireExecutionException;
+import soot.EntryPoints;
+import soot.SootClass;
+import soot.SootMethod;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -117,6 +124,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     protected boolean selectMore;
 
+    protected boolean selectBasedOnMethodsCall;
+
     protected boolean detectOrNot;
 
     private Set<String> affectedTestClasses;
@@ -156,6 +165,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> allTests = new HashSet<>(getTestClasses(project, this.runner.framework()));
         Set<String> affectedTests = new HashSet<>(allTests);
 
+        System.out.println("SAME?: " + isSameClassPath(sfPathElements) + " " + hasSameJarChecksum(sfPathElements));
+        boolean selectAll = false;
         if (!isSameClassPath(sfPathElements) || !hasSameJarChecksum(sfPathElements)) {
             // Force retestAll because classpath changed since last run
             // don't compute changed and non-affected classes
@@ -164,7 +175,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             nonAffectedTests = new HashSet<>();
             Writer.writeClassPath(cpString, artifactsDir);
             Writer.writeJarChecksums(sfPathElements, artifactsDir, jarCheckSums);
-            return affectedTests;
+            selectAll = true;
         }
 
         nonAffectedTests = new HashSet<>();
@@ -183,18 +194,59 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Loadables loadables = updateForNextRun(project, nonAffectedTests);
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
-        if (!selectMore || loadables == null) {
+        if (!selectMore || loadables == null || selectAll) {
             return affectedTests;
         }
 
         Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
 
+        // the dependency map from test classes to their dependencies
         Map<String, Set<String>> reverseTransitiveClosure = getReverseClosure(transitiveClosure);
 
         Set<String> additionalTests = new HashSet<>();
 
         // iter through the affected tests and find what depends on
         Set<String> processedClasses = new HashSet<>();
+        Set<String> affectedClasses = new HashSet<>();
+
+        if (selectBasedOnMethodsCall) {
+            this.affectedTestClasses = affectedTests;
+            Map<String, List<String>> testClassToMethod = new HashMap<>();
+            List<SootMethod> entryPoints = new ArrayList<>();
+            List<String> currentTests = getTests(project, this.runner.framework());
+
+            String delimiter = this.runner.framework().getDelimiter();
+            for (String test : currentTests) {
+                String className = test.substring(0, test.lastIndexOf(delimiter));
+                if (!testClassToMethod.containsKey(className)) {
+                    testClassToMethod.put(className, new ArrayList<>());
+                }
+                testClassToMethod.get(className).add(test);
+            }
+
+            for (String testClass : testClassToMethod.keySet()) {
+                Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
+                for(String item : sootNewAffectedClasses) {
+                    System.out.println("ITEM: " + item);
+                }
+                affectedClasses.addAll(sootNewAffectedClasses);
+            }
+            for(String item : affectedTests) {
+                System.out.println("ITEM(0): " + item);
+            }
+            for (String affectedClass : affectedClasses) {
+                if (reverseTransitiveClosure.containsKey(affectedClass)) {
+                    Set<String> additionalAffectedTestClasses = reverseTransitiveClosure.get(affectedClass);
+                    for (String additionalAffectedTestClass : additionalAffectedTestClasses) {
+                        System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
+                        additionalTests.add(additionalAffectedTestClass);
+                    }
+                }
+            }
+            affectedTests.addAll(additionalTests);
+            return affectedTests;
+        }
+
         for (String affectedTest : affectedTests) {
             Set<String> dependencies = transitiveClosure.get(affectedTest);
             for (String dependency : dependencies) {
@@ -274,7 +326,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
         updateChecksums = true;
         useThirdParty = false;
         zlcFormat = ZLCFormat.PLAIN_TEXT;
-        selectMore = Configuration.config().getProperty("dt.incdetector.selectmore", true);
+        selectMore = Configuration.config().getProperty("dt.incdetector.selectmore", false);
+        selectBasedOnMethodsCall = Configuration.config().getProperty("dt.incdetector.selectonmethods", false);
         detectOrNot = Configuration.config().getProperty("dt.incdetector.detectornot", true);
 
         getSureFireClassPath(project);

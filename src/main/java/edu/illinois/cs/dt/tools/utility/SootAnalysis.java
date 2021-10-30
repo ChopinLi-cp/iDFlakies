@@ -1,0 +1,169 @@
+package edu.illinois.cs.dt.tools.utility;
+
+import soot.*;
+import soot.jimple.*;
+import soot.jimple.toolkits.callgraph.CallGraph;
+import soot.jimple.toolkits.callgraph.Edge;
+import soot.jimple.toolkits.callgraph.ReachableMethods;
+import soot.jimple.spark.ondemand.pautil.SootUtil;
+
+import soot.options.Options;
+import soot.util.queue.QueueReader;
+
+import java.io.File;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import static soot.SootClass.BODIES;
+
+public class SootAnalysis {
+
+    private static String sourceDirectory;
+    private static String clzName;
+    private static String methodName;
+    private static List<SootMethod> entryPoints = new ArrayList();
+    private static LinkedList<String> excludeList;
+    private static Set<String> affectedClasses = new HashSet<>();
+
+
+    private static LinkedList<String> getExcludeList() {
+        if (excludeList == null) {
+            excludeList = new LinkedList<String>();
+
+            // explicitly include packages for shorter runtime:
+            excludeList.add("java.*");
+            excludeList.add("javax.*");
+            excludeList.add("jdk.*");
+            excludeList.add("soot.*");
+            excludeList.add("sun.*");
+            excludeList.add("sunw.*");
+            excludeList.add("com.sun.*");
+            excludeList.add("com.ibm.*");
+            excludeList.add("com.apple.*");
+            excludeList.add("android.*");
+            excludeList.add("apple.awt.*");
+            excludeList.add("org.apache.*");
+        }
+        return excludeList;
+    }
+
+    private static boolean inExcludeList(String className) {
+        for (int i = 0; i < excludeList.size(); i++) {
+            String libPackage = excludeList.get(i).substring(0, excludeList.get(i).length()-1);
+            if (className.startsWith(libPackage)) {
+                return true;
+            }
+
+        }
+        return false;
+    }
+
+    private static void excludeJDKLibrary() {
+        // exclude jdk classes
+        Options.v().set_exclude(getExcludeList());
+        // this option must be disabled for a sound call graph
+        Options.v().set_no_bodies_for_excluded(true);
+        Options.v().set_allow_phantom_refs(true);
+    }
+
+    private static void setupSoot() {
+        G.reset();
+
+        System.out.println("EXCLUDE: " + Options.v().exclude());
+        excludeJDKLibrary();
+        System.out.println("EXCLUDE: " + Options.v().exclude());
+
+        Options.v().set_prepend_classpath(true);
+        Options.v().set_app(true);
+        Options.v().set_soot_classpath(sourceDirectory);
+        Options.v().set_output_format(Options.output_format_jimple);
+        // Options.v().set_process_dir(Collections.singletonList(sourceDirectory));
+        Options.v().set_whole_program(true);
+
+    }
+
+    private static void reportFieldRefInfo(Stmt stmt) {
+        FieldRef fieldRef = stmt.getFieldRef();
+        // System.out.println("FIELDREF: " + fieldRef);
+        fieldRef.apply(new AbstractRefSwitch() {
+            @Override
+            public void caseStaticFieldRef(StaticFieldRef v) {
+                // A static field reference
+                System.out.println("A static field reference: " + v.getFieldRef() + " " + v.getFieldRef().isStatic());
+                affectedClasses.add(v.getFieldRef().declaringClass().getName());
+                // affectedClasses.add(v.getField().getName());
+            }
+
+            @Override
+            public void caseInstanceFieldRef(InstanceFieldRef v) {
+                // System.out.println("A instance field reference: " + v.getFieldRef() + " " + v.toString());
+                // affectedClasses.add(v.getFieldRef().declaringClass().getName());
+            }
+        });
+    }
+
+
+    public static Set<String> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod) {
+
+        sourceDirectory = srcDir;
+        clzName = clsName;
+
+        setupSoot();
+        SootClass sc = Scene.v().forceResolve(clzName, BODIES);// Scene.v().loadClassAndSupport(clsName);
+        sc.setApplicationClass();
+        Scene.v().loadNecessaryClasses();
+
+        // Get clinits
+        for (SootMethod sm : EntryPoints.v().clinitsOf(sc)) {
+            entryPoints.add(sm);
+        }
+        SootMethod init = sc.getMethod("<init>", new ArrayList<>());
+        entryPoints.add(init);
+        // Add the tests
+        for (String test : testClassToMethod.get(clzName)) {
+            try {
+                entryPoints.add(sc.getMethodByName(test));
+            } catch (Exception e) {
+
+            }
+        }
+        Scene.v().setEntryPoints(entryPoints);
+        PackManager.v().runPacks();
+
+        int c = 1;
+
+        // Call graph
+        CallGraph callGraph = Scene.v().getCallGraph();
+        ReachableMethods rm = new ReachableMethods(callGraph, entryPoints);
+        rm.update();
+        QueueReader qr = rm.listener();
+
+        System.out.println("-------------------");
+        System.out.println("-----Reachable Methods-----");
+
+        qr = rm.listener();
+        for(Iterator<SootMethod> it = qr; it.hasNext(); ) {
+            SootMethod reachableMethod = it.next();
+            if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
+                continue;
+            }
+            JimpleBody reachableMethodBody = (JimpleBody) reachableMethod.retrieveActiveBody();
+            c = 0;
+            for (Unit u : reachableMethodBody.getUnits()) {
+                c++;
+                Stmt stmt = (Stmt) u;
+                if(stmt.containsFieldRef())
+                    reportFieldRefInfo(stmt);
+            }
+        }
+
+        System.out.println("-------------------");
+        System.out.println("All the classes that could be accessed through accessing corresponding static fields.");
+        for(String item: affectedClasses) {
+            System.out.print(item + ";");
+        }
+        System.out.println("");
+        return affectedClasses;
+    }
+}
+
