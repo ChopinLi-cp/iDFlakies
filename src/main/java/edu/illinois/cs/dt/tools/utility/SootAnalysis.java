@@ -43,6 +43,8 @@ public class SootAnalysis {
             excludeList.add("android.*");
             excludeList.add("apple.awt.*");
             excludeList.add("org.apache.*");
+            excludeList.add("org.xml.*");
+            excludeList.add("org.codehaus.*");
         }
         return excludeList;
     }

@@ -194,8 +194,11 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Loadables loadables = updateForNextRun(project, nonAffectedTests);
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
-        if (!selectMore || loadables == null || selectAll) {
+        if (!selectMore || loadables == null) {
             return affectedTests;
+        }
+        if ( selectAll || affectedTests.size() == allTests.size() ) {
+            return allTests;
         }
 
         Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
@@ -226,13 +229,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
             for (String testClass : testClassToMethod.keySet()) {
                 Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
-                for(String item : sootNewAffectedClasses) {
-                    System.out.println("ITEM: " + item);
-                }
                 affectedClasses.addAll(sootNewAffectedClasses);
-            }
-            for(String item : affectedTests) {
-                System.out.println("ITEM(0): " + item);
             }
             for (String affectedClass : affectedClasses) {
                 if (reverseTransitiveClosure.containsKey(affectedClass)) {
@@ -437,7 +434,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         return classes;
     }
 
-    private boolean hasSameJarChecksum(List<String> cleanSfClassPath) throws FileNotFoundException, MojoExecutionException {
+    private boolean hasSameJarChecksum(List<String> cleanSfClassPath) throws FileNotFoundException {
         if (cleanSfClassPath.isEmpty()) {
             return true;
         }
