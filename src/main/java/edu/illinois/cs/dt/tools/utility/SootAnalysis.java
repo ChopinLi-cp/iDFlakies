@@ -23,7 +23,6 @@ public class SootAnalysis {
     private static String methodName;
     private static List<SootMethod> entryPoints = new ArrayList();
     private static LinkedList<String> excludeList;
-    private static Set<String> affectedClasses = new HashSet<>();
 
 
     private static LinkedList<String> getExcludeList() {
@@ -84,7 +83,7 @@ public class SootAnalysis {
 
     }
 
-    private static void reportFieldRefInfo(Stmt stmt) {
+    private static void reportFieldRefInfo(Stmt stmt, final Set<String> affectedClasses) {
         FieldRef fieldRef = stmt.getFieldRef();
         // System.out.println("FIELDREF: " + fieldRef);
         fieldRef.apply(new AbstractRefSwitch() {
@@ -106,6 +105,7 @@ public class SootAnalysis {
 
 
     public static Set<String> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod) {
+        Set<String> affectedClasses = new HashSet<>();
 
         sourceDirectory = srcDir;
         clzName = clsName;
@@ -155,7 +155,7 @@ public class SootAnalysis {
                 c++;
                 Stmt stmt = (Stmt) u;
                 if(stmt.containsFieldRef())
-                    reportFieldRefInfo(stmt);
+                    reportFieldRefInfo(stmt, affectedClasses);
             }
         }
 
