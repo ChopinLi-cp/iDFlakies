@@ -80,6 +80,7 @@ public class SootAnalysis {
         Options.v().set_output_format(Options.output_format_jimple);
         // Options.v().set_process_dir(Collections.singletonList(sourceDirectory));
         Options.v().set_whole_program(true);
+        entryPoints.clear();
 
     }
 
@@ -115,12 +116,22 @@ public class SootAnalysis {
         sc.setApplicationClass();
         Scene.v().loadNecessaryClasses();
 
-        // Get clinits
-        for (SootMethod sm : EntryPoints.v().clinitsOf(sc)) {
-            entryPoints.add(sm);
+        try {
+            // Get clinits
+            for (SootMethod sm : EntryPoints.v().clinitsOf(sc)) {
+                entryPoints.add(sm);
+            }
+        } catch (Exception e) {
+            System.out.println("CLINIT METHOD MAY NOT EXIST!");
+            e.printStackTrace();
         }
-        SootMethod init = sc.getMethod("<init>", new ArrayList<>());
-        entryPoints.add(init);
+        try {
+            SootMethod init = sc.getMethod("<init>", new ArrayList<>());
+            entryPoints.add(init);
+        } catch (Exception e) {
+            System.out.println("INIT METHOD MAY NOT EXIST!");
+            e.printStackTrace();
+        }
         // Add the tests
         for (String test : testClassToMethod.get(clzName)) {
             try {
@@ -145,17 +156,22 @@ public class SootAnalysis {
 
         qr = rm.listener();
         for(Iterator<SootMethod> it = qr; it.hasNext(); ) {
-            SootMethod reachableMethod = it.next();
-            if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
-                continue;
-            }
-            JimpleBody reachableMethodBody = (JimpleBody) reachableMethod.retrieveActiveBody();
-            c = 0;
-            for (Unit u : reachableMethodBody.getUnits()) {
-                c++;
-                Stmt stmt = (Stmt) u;
-                if(stmt.containsFieldRef())
-                    reportFieldRefInfo(stmt, affectedClasses);
+            try {
+                SootMethod reachableMethod = it.next();
+                if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
+                    continue;
+                }
+                JimpleBody reachableMethodBody = (JimpleBody) reachableMethod.retrieveActiveBody();
+                c = 0;
+                for (Unit u : reachableMethodBody.getUnits()) {
+                    c++;
+                    Stmt stmt = (Stmt) u;
+                    if (stmt.containsFieldRef())
+                        reportFieldRefInfo(stmt, affectedClasses);
+                }
+            } catch (Exception e) {
+                System.out.println("LIKELY ERROR: cannot get resident body for phantom method");
+                e.printStackTrace();
             }
         }
 

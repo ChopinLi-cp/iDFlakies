@@ -126,6 +126,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     protected boolean selectBasedOnMethodsCall;
 
+    protected boolean selectBasedOnMethodsCallUpgrade;
+
     protected boolean detectOrNot;
 
     private Set<String> affectedTestClasses;
@@ -216,7 +218,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             this.affectedTestClasses = affectedTests;
             Map<String, List<String>> testClassToMethod = new HashMap<>();
             List<SootMethod> entryPoints = new ArrayList<>();
-            List<String> currentTests = getTests(project, this.runner.framework());
+            List<String> currentTests = super.getTests(project, this.runner.framework());
 
             String delimiter = this.runner.framework().getDelimiter();
             for (String test : currentTests) {
@@ -231,12 +233,22 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
                 affectedClasses.addAll(sootNewAffectedClasses);
             }
+
             for (String affectedClass : affectedClasses) {
                 if (reverseTransitiveClosure.containsKey(affectedClass)) {
                     Set<String> additionalAffectedTestClasses = reverseTransitiveClosure.get(affectedClass);
                     for (String additionalAffectedTestClass : additionalAffectedTestClasses) {
-                        System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
-                        additionalTests.add(additionalAffectedTestClass);
+                        if(selectBasedOnMethodsCallUpgrade) {
+                            Set<String> reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
+                            if (reachableClassesFromAdditionalAffectedTestClass.contains(affectedClass)) {
+                                System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
+                                additionalTests.add(additionalAffectedTestClass);
+                            }
+                        }
+                        else {
+                            System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
+                            additionalTests.add(additionalAffectedTestClass);
+                        }
                     }
                 }
             }
@@ -325,6 +337,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         zlcFormat = ZLCFormat.PLAIN_TEXT;
         selectMore = Configuration.config().getProperty("dt.incdetector.selectmore", false);
         selectBasedOnMethodsCall = Configuration.config().getProperty("dt.incdetector.selectonmethods", false);
+        selectBasedOnMethodsCallUpgrade = Configuration.config().getProperty("dt.incdetector.selectonmethodsupgrade", false);
         detectOrNot = Configuration.config().getProperty("dt.incdetector.detectornot", true);
 
         getSureFireClassPath(project);

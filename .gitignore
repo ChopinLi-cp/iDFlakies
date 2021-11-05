@@ -4,3 +4,6 @@ target/
 .*.swp
 *.o
 *.hi
+.idea/
+.starts/
+idflakies.iml
