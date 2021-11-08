@@ -196,11 +196,11 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Loadables loadables = updateForNextRun(project, nonAffectedTests);
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
-        if (!selectMore || loadables == null) {
-            return affectedTests;
-        }
         if ( selectAll || affectedTests.size() == allTests.size() ) {
             return allTests;
+        }
+        if (!selectMore || loadables == null) {
+            return affectedTests;
         }
 
         Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();

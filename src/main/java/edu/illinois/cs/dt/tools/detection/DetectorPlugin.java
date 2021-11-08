@@ -350,7 +350,6 @@ public class DetectorPlugin extends TestPlugin {
                             tests.add(classData.className + delimiter + testName);
                         }
                     }
-
                     return tests;
                 } else {
                     return locateTests(project, testFramework);
