@@ -230,16 +230,24 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
 
             for (String testClass : testClassToMethod.keySet()) {
+                System.out.println("GOING TO RUN SOOT ANALYSIS FOR TC: " + testClass);
+                long startTime = System.currentTimeMillis();
                 Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
+                System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
                 affectedClasses.addAll(sootNewAffectedClasses);
             }
 
+            Set<String> additionalAffectedTestClassesSet = new HashSet<>();
             for (String affectedClass : affectedClasses) {
                 if (reverseTransitiveClosure.containsKey(affectedClass)) {
                     Set<String> additionalAffectedTestClasses = reverseTransitiveClosure.get(affectedClass);
                     for (String additionalAffectedTestClass : additionalAffectedTestClasses) {
                         if(selectBasedOnMethodsCallUpgrade) {
+                            if(additionalAffectedTestClassesSet.contains(additionalAffectedTestClass)) {
+                                continue;
+                            }
                             Set<String> reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
+                            additionalAffectedTestClassesSet.add(additionalAffectedTestClass);
                             if (reachableClassesFromAdditionalAffectedTestClass.contains(affectedClass)) {
                                 System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
                                 additionalTests.add(additionalAffectedTestClass);

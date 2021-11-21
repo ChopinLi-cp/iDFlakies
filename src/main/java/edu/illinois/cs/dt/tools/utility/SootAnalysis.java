@@ -154,7 +154,7 @@ public class SootAnalysis {
         System.out.println("-------------------");
         System.out.println("-----Reachable Methods-----");
 
-        qr = rm.listener();
+        // qr = rm.listener();
         for(Iterator<SootMethod> it = qr; it.hasNext(); ) {
             try {
                 SootMethod reachableMethod = it.next();
