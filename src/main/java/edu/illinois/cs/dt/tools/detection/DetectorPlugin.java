@@ -218,7 +218,7 @@ public class DetectorPlugin extends TestPlugin {
 
         if (!tests.isEmpty()) {
             Files.createDirectories(outputPath);
-            Files.write(DetectorPathManager.originalOrderPath(), String.join(System.lineSeparator(), getOriginalOrder(project, this.runner.framework(), true)).getBytes());
+            Files.write(DetectorPathManager.originalOrderPath(), String.join(System.lineSeparator(), getOriginalOrder(project, this.runner.framework())).getBytes());
             Files.write(DetectorPathManager.selectedTestPath(), String.join(System.lineSeparator(), tests).getBytes());
             final Detector detector = DetectorFactory.makeDetector(this.runner, tests, rounds);
             TestPluginUtil.project.info("Created dependent test detector (" + detector.getClass() + ").");

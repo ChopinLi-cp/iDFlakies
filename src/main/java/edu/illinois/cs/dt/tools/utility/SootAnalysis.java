@@ -8,6 +8,8 @@ import soot.jimple.toolkits.callgraph.ReachableMethods;
 import soot.jimple.spark.ondemand.pautil.SootUtil;
 
 import soot.options.Options;
+import soot.tagkit.AnnotationTag;
+import soot.tagkit.VisibilityAnnotationTag;
 import soot.util.queue.QueueReader;
 
 import java.io.File;
@@ -104,6 +106,24 @@ public class SootAnalysis {
         });
     }
 
+    private static boolean hasBeforeOrAfterAnnotation(SootMethod sootMethod) {
+        boolean hasAnnotation = false;
+        VisibilityAnnotationTag tag = (VisibilityAnnotationTag) sootMethod.getTag("VisibilityAnnotationTag");
+        if (tag != null) {
+            for (AnnotationTag annotation : tag.getAnnotations()) {
+                System.out.println("annotation.getType(): " + annotation.getType());
+                if (annotation.getType().equals("Lorg/junit/Before;") || annotation.getType().equals("Lorg/junit/After;")
+                        || annotation.getType().equals("Lorg/junit/BeforeClass;") || annotation.getType().equals("Lorg/junit/AfterClass;")
+                        || annotation.getType().equals("Lorg/junit/BeforeEach;") || annotation.getType().equals("Lorg/junit/AfterEach;")
+                        || annotation.getType().equals("Lorg/junit/BeforeAll;") || annotation.getType().equals("Lorg/junit/AfterAll;")) {
+                    System.out.println("annotation.getType(): " + annotation.getType() + " " + sootMethod.getName());
+                    hasAnnotation = true;
+                    break;
+                }
+            }
+        }
+        return hasAnnotation;
+    }
 
     public static Set<String> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod) {
         Set<String> affectedClasses = new HashSet<>();
@@ -138,6 +158,16 @@ public class SootAnalysis {
                 entryPoints.add(sc.getMethodByName(test));
             } catch (Exception e) {
 
+            }
+        }
+        for (SootMethod sootMethod : sc.getMethods()) {
+            try {
+                if (hasBeforeOrAfterAnnotation(sootMethod)) {
+                    entryPoints.add(sootMethod);
+                }
+            } catch (Exception e){
+                System.out.println("BUG EXISTS WHEN DETECTING @BEFORE ANNOTATIONS!");
+                e.printStackTrace();
             }
         }
         Scene.v().setEntryPoints(entryPoints);
