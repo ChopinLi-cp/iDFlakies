@@ -116,7 +116,7 @@ public class SootAnalysis {
                         || annotation.getType().equals("Lorg/junit/BeforeClass;") || annotation.getType().equals("Lorg/junit/AfterClass;")
                         || annotation.getType().equals("Lorg/junit/BeforeEach;") || annotation.getType().equals("Lorg/junit/AfterEach;")
                         || annotation.getType().equals("Lorg/junit/BeforeAll;") || annotation.getType().equals("Lorg/junit/AfterAll;")) {
-                    System.out.println("annotation.getType(): " + annotation.getType() + " " + sootMethod.getName());
+                    System.out.println("annotation.getType(): " + annotation.getType() + " " + sootMethod.getDeclaringClass() + "." + sootMethod.getName());
                     hasAnnotation = true;
                     break;
                 }
@@ -206,7 +206,7 @@ public class SootAnalysis {
         }
 
         System.out.println("-------------------");
-        System.out.println("All the classes that could be accessed through accessing corresponding static fields.");
+        System.out.println("All the classes that could be accessed through accessing corresponding static fields. (" + clsName + ");");
         for(String item: affectedClasses) {
             System.out.print(item + ";");
         }

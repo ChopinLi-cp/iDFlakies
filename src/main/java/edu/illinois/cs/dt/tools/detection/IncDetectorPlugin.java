@@ -36,6 +36,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.logging.Level;
 
@@ -141,6 +142,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         }
         this.coordinates = logger.coordinates();
 
+        long startTime = System.currentTimeMillis();
         try {
             affectedTestClasses = computeAffectedTests(project);
             if (!detectOrNot) {
@@ -154,8 +156,11 @@ public class IncDetectorPlugin extends DetectorPlugin {
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         }
+        timing(startTime);
 
+        startTime = System.currentTimeMillis();
         logger.runAndLogError(() -> detectorExecute(logger, project, moduleRounds(coordinates)));
+        timing(startTime);
     }
 
     // from SelectMojo
@@ -237,17 +242,23 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 affectedClasses.addAll(sootNewAffectedClasses);
             }
 
-            Set<String> additionalAffectedTestClassesSet = new HashSet<>();
+            Map<String, Set<String>> additionalAffectedTestClassesSet = new HashMap<>();
             for (String affectedClass : affectedClasses) {
                 if (reverseTransitiveClosure.containsKey(affectedClass)) {
                     Set<String> additionalAffectedTestClasses = reverseTransitiveClosure.get(affectedClass);
+                    System.out.println("aATC: " + affectedClass + " SET: " + additionalAffectedTestClasses);
                     for (String additionalAffectedTestClass : additionalAffectedTestClasses) {
                         if(selectBasedOnMethodsCallUpgrade) {
-                            if(additionalAffectedTestClassesSet.contains(additionalAffectedTestClass)) {
-                                continue;
+                            Set<String> reachableClassesFromAdditionalAffectedTestClass;
+                            if(additionalAffectedTestClassesSet.containsKey(additionalAffectedTestClass)) {
+                                reachableClassesFromAdditionalAffectedTestClass = additionalAffectedTestClassesSet.get(additionalAffectedTestClass);
                             }
-                            Set<String> reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
-                            additionalAffectedTestClassesSet.add(additionalAffectedTestClass);
+                            else {
+                                System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
+                                reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
+                                System.out.println("reachableClassesFromAdditionalAffectedTestClass: " + reachableClassesFromAdditionalAffectedTestClass);
+                                additionalAffectedTestClassesSet.put(additionalAffectedTestClass, reachableClassesFromAdditionalAffectedTestClass);
+                            }
                             if (reachableClassesFromAdditionalAffectedTestClass.contains(affectedClass)) {
                                 System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
                                 additionalTests.add(additionalAffectedTestClass);
@@ -552,6 +563,19 @@ public class IncDetectorPlugin extends DetectorPlugin {
         if (globalLogLevel <= Level.FINEST.intValue()) {
             RTSUtil.saveForNextRun(artifactsDir, graph, printGraph, graphFile);
             Writer.writeClassPath(sfPathString, artifactsDir);
+        }
+    }
+
+    private void timing(long startTime) {
+        long endTime = System.currentTimeMillis();
+        double duration = (endTime - startTime)/1000.0;
+
+        String time = duration + ",";
+        try {
+            Files.write(DetectorPathManager.timePath(), time.getBytes(),
+                    StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
