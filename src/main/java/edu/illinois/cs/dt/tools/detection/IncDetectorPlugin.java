@@ -566,19 +566,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
         }
     }
 
-    private void timing(long startTime) {
-        long endTime = System.currentTimeMillis();
-        double duration = (endTime - startTime)/1000.0;
-
-        String time = duration + ",";
-        try {
-            Files.write(DetectorPathManager.timePath(), time.getBytes(),
-                    StandardOpenOption.APPEND);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
     public Loadables updateForNextRun(final ProjectWrapper project, Set<String> nonAffected) throws IOException, MojoExecutionException {
         long start = System.currentTimeMillis();
 

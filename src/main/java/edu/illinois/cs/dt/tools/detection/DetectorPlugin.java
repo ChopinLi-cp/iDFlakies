@@ -26,10 +26,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.RuntimeException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -209,7 +206,9 @@ public class DetectorPlugin extends TestPlugin {
         final ErrorLogger logger = new ErrorLogger(project);
         this.coordinates = logger.coordinates();
 
+        long startTime = System.currentTimeMillis();
         logger.runAndLogError(() -> detectorExecute(logger, project, moduleRounds(coordinates)));
+        timing(startTime);
     }
 
     protected Void detectorExecute(final ErrorLogger logger, final ProjectWrapper project, final int rounds) throws IOException {
@@ -375,5 +374,25 @@ public class DetectorPlugin extends TestPlugin {
             }
         }
         return aliveRunners;
+    }
+
+    public void timing(long startTime) {
+        if(!Files.exists(DetectorPathManager.timePath())) {
+            try {
+                Files.createFile(DetectorPathManager.timePath());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        long endTime = System.currentTimeMillis();
+        double duration = (endTime - startTime)/1000.0;
+
+        String time = duration + ",";
+        try {
+            Files.write(DetectorPathManager.timePath(), time.getBytes(),
+                    StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
