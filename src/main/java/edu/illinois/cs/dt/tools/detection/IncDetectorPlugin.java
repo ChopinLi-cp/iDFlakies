@@ -172,7 +172,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> allTests = new HashSet<>(getTestClasses(project, this.runner.framework()));
         Set<String> affectedTests = new HashSet<>(allTests);
 
-        System.out.println("SAME?: " + isSameClassPath(sfPathElements) + " " + hasSameJarChecksum(sfPathElements));
+        // System.out.println("SAME?: " + isSameClassPath(sfPathElements) + " " + hasSameJarChecksum(sfPathElements));
         boolean selectAll = false;
         if (!isSameClassPath(sfPathElements) || !hasSameJarChecksum(sfPathElements)) {
             // Force retestAll because classpath changed since last run
@@ -187,9 +187,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
         nonAffectedTests = new HashSet<>();
         Pair<Set<String>, Set<String>> data = computeChangeData(false);
-        System.out.println("CHANGEDATA: " + data);
+        // System.out.println("CHANGEDATA: " + data);
         nonAffectedTests = data == null ? new HashSet<String>() : data.getKey();
-        System.out.println("NONAFFECTEDTESTS: " + nonAffectedTests.size() + " " + nonAffectedTests);
+        // System.out.println("NONAFFECTEDTESTS: " + nonAffectedTests.size() + " " + nonAffectedTests);
         List<String> excludePaths = Writer.fqnsToExcludePath(nonAffectedTests);
         dynamicallyUpdateExcludes(excludePaths);
         affectedTests.removeAll(nonAffectedTests);
@@ -235,10 +235,10 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
 
             for (String testClass : testClassToMethod.keySet()) {
-                System.out.println("GOING TO RUN SOOT ANALYSIS FOR TC: " + testClass);
-                long startTime = System.currentTimeMillis();
+                // System.out.println("GOING TO RUN SOOT ANALYSIS FOR TC: " + testClass);
+                // long startTime = System.currentTimeMillis();
                 Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
-                System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
+                // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
                 affectedClasses.addAll(sootNewAffectedClasses);
             }
 
@@ -246,7 +246,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             for (String affectedClass : affectedClasses) {
                 if (reverseTransitiveClosure.containsKey(affectedClass)) {
                     Set<String> additionalAffectedTestClasses = reverseTransitiveClosure.get(affectedClass);
-                    System.out.println("aATC: " + affectedClass + " SET: " + additionalAffectedTestClasses);
+                    // System.out.println("aATC: " + affectedClass + " SET: " + additionalAffectedTestClasses);
                     for (String additionalAffectedTestClass : additionalAffectedTestClasses) {
                         if(selectBasedOnMethodsCallUpgrade) {
                             Set<String> reachableClassesFromAdditionalAffectedTestClass;
@@ -254,18 +254,18 @@ public class IncDetectorPlugin extends DetectorPlugin {
                                 reachableClassesFromAdditionalAffectedTestClass = additionalAffectedTestClassesSet.get(additionalAffectedTestClass);
                             }
                             else {
-                                System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
+                                // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
                                 reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
-                                System.out.println("reachableClassesFromAdditionalAffectedTestClass: " + reachableClassesFromAdditionalAffectedTestClass);
+                                // System.out.println("reachableClassesFromAdditionalAffectedTestClass: " + reachableClassesFromAdditionalAffectedTestClass);
                                 additionalAffectedTestClassesSet.put(additionalAffectedTestClass, reachableClassesFromAdditionalAffectedTestClass);
                             }
                             if (reachableClassesFromAdditionalAffectedTestClass.contains(affectedClass)) {
-                                System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
+                                // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
                                 additionalTests.add(additionalAffectedTestClass);
                             }
                         }
                         else {
-                            System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
+                            // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
                             additionalTests.add(additionalAffectedTestClass);
                         }
                     }
@@ -295,9 +295,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
                         }
                     }
                 } catch (ClassNotFoundException CNFE)  {
-                    System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                    // System.out.println("Can not load class. Test dependency skipping: " + dependency);
                 } catch (NoClassDefFoundError NCDFE)  {
-                    System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                    // System.out.println("Can not load class. Test dependency skipping: " + dependency);
                 }
 
             }

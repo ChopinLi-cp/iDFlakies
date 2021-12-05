@@ -72,9 +72,9 @@ public class SootAnalysis {
     private static void setupSoot() {
         G.reset();
 
-        System.out.println("EXCLUDE: " + Options.v().exclude());
+        // System.out.println("EXCLUDE: " + Options.v().exclude());
         excludeJDKLibrary();
-        System.out.println("EXCLUDE: " + Options.v().exclude());
+        // System.out.println("EXCLUDE: " + Options.v().exclude());
 
         Options.v().set_prepend_classpath(true);
         Options.v().set_app(true);
@@ -93,7 +93,7 @@ public class SootAnalysis {
             @Override
             public void caseStaticFieldRef(StaticFieldRef v) {
                 // A static field reference
-                System.out.println("A static field reference: " + v.getFieldRef() + " " + v.getFieldRef().isStatic());
+                // System.out.println("A static field reference: " + v.getFieldRef() + " " + v.getFieldRef().isStatic());
                 affectedClasses.add(v.getFieldRef().declaringClass().getName());
                 // affectedClasses.add(v.getField().getName());
             }
@@ -111,12 +111,12 @@ public class SootAnalysis {
         VisibilityAnnotationTag tag = (VisibilityAnnotationTag) sootMethod.getTag("VisibilityAnnotationTag");
         if (tag != null) {
             for (AnnotationTag annotation : tag.getAnnotations()) {
-                System.out.println("annotation.getType(): " + annotation.getType());
+                // System.out.println("annotation.getType(): " + annotation.getType());
                 if (annotation.getType().equals("Lorg/junit/Before;") || annotation.getType().equals("Lorg/junit/After;")
                         || annotation.getType().equals("Lorg/junit/BeforeClass;") || annotation.getType().equals("Lorg/junit/AfterClass;")
                         || annotation.getType().equals("Lorg/junit/BeforeEach;") || annotation.getType().equals("Lorg/junit/AfterEach;")
                         || annotation.getType().equals("Lorg/junit/BeforeAll;") || annotation.getType().equals("Lorg/junit/AfterAll;")) {
-                    System.out.println("annotation.getType(): " + annotation.getType() + " " + sootMethod.getDeclaringClass() + "." + sootMethod.getName());
+                    // System.out.println("annotation.getType(): " + annotation.getType() + " " + sootMethod.getDeclaringClass() + "." + sootMethod.getName());
                     hasAnnotation = true;
                     break;
                 }
@@ -142,14 +142,14 @@ public class SootAnalysis {
                 entryPoints.add(sm);
             }
         } catch (Exception e) {
-            System.out.println("CLINIT METHOD MAY NOT EXIST!");
+            // System.out.println("CLINIT METHOD MAY NOT EXIST!");
             e.printStackTrace();
         }
         try {
             SootMethod init = sc.getMethod("<init>", new ArrayList<>());
             entryPoints.add(init);
         } catch (Exception e) {
-            System.out.println("INIT METHOD MAY NOT EXIST!");
+            // System.out.println("INIT METHOD MAY NOT EXIST!");
             e.printStackTrace();
         }
         // Add the tests
@@ -166,7 +166,7 @@ public class SootAnalysis {
                     entryPoints.add(sootMethod);
                 }
             } catch (Exception e){
-                System.out.println("BUG EXISTS WHEN DETECTING @BEFORE ANNOTATIONS!");
+                // System.out.println("BUG EXISTS WHEN DETECTING @BEFORE ANNOTATIONS!");
                 e.printStackTrace();
             }
         }
@@ -181,8 +181,8 @@ public class SootAnalysis {
         rm.update();
         QueueReader qr = rm.listener();
 
-        System.out.println("-------------------");
-        System.out.println("-----Reachable Methods-----");
+        // System.out.println("-------------------");
+        // System.out.println("-----Reachable Methods-----");
 
         // qr = rm.listener();
         for(Iterator<SootMethod> it = qr; it.hasNext(); ) {
@@ -200,17 +200,17 @@ public class SootAnalysis {
                         reportFieldRefInfo(stmt, affectedClasses);
                 }
             } catch (Exception e) {
-                System.out.println("LIKELY ERROR: cannot get resident body for phantom method");
+                // System.out.println("LIKELY ERROR: cannot get resident body for phantom method");
                 e.printStackTrace();
             }
         }
 
-        System.out.println("-------------------");
-        System.out.println("All the classes that could be accessed through accessing corresponding static fields. (" + clsName + ");");
-        for(String item: affectedClasses) {
-            System.out.print(item + ";");
-        }
-        System.out.println("");
+        // System.out.println("-------------------");
+        // System.out.println("All the classes that could be accessed through accessing corresponding static fields. (" + clsName + ");");
+        // for(String item: affectedClasses) {
+        //     System.out.print(item + ";");
+        // }
+        // System.out.println("");
         return affectedClasses;
     }
 }
