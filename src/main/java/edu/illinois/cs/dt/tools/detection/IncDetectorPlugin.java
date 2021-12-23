@@ -129,6 +129,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     protected boolean selectBasedOnMethodsCallUpgrade;
 
+    protected boolean removeBasedOnMethodsCall;
+
     protected boolean detectOrNot;
 
     private Set<String> affectedTestClasses;
@@ -237,9 +239,17 @@ public class IncDetectorPlugin extends DetectorPlugin {
             for (String testClass : testClassToMethod.keySet()) {
                 // System.out.println("GOING TO RUN SOOT ANALYSIS FOR TC: " + testClass);
                 // long startTime = System.currentTimeMillis();
+                // if (affectedTests.contains(testClass)) {
+                //     continue;
+                // }
                 Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
                 // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
-                affectedClasses.addAll(sootNewAffectedClasses);
+                if (sootNewAffectedClasses == null) {
+                    affectedClasses.remove(testClass);
+                }
+                else {
+                    affectedClasses.addAll(sootNewAffectedClasses);
+                }
             }
 
             Map<String, Set<String>> additionalAffectedTestClassesSet = new HashMap<>();
@@ -357,6 +367,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         selectMore = Configuration.config().getProperty("dt.incdetector.selectmore", false);
         selectBasedOnMethodsCall = Configuration.config().getProperty("dt.incdetector.selectonmethods", false);
         selectBasedOnMethodsCallUpgrade = Configuration.config().getProperty("dt.incdetector.selectonmethodsupgrade", false);
+        removeBasedOnMethodsCall = Configuration.config().getProperty("dt.incdetector.removeonmethods", false);
         detectOrNot = Configuration.config().getProperty("dt.incdetector.detectornot", true);
 
         getSureFireClassPath(project);
