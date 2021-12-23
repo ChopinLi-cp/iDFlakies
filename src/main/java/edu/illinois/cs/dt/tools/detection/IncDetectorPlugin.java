@@ -244,7 +244,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 // }
                 Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
                 // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
-                if (sootNewAffectedClasses == null) {
+                if (sootNewAffectedClasses == null && removeBasedOnMethodsCall) {
                     affectedClasses.remove(testClass);
                 }
                 else {
