@@ -204,7 +204,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
         if ( selectAll || affectedTests.size() == allTests.size() ) {
-            return allTests;
+            if (!removeBasedOnMethodsCall) {
+                return allTests;
+            }
         }
         if (!selectMore || loadables == null) {
             return affectedTests;
@@ -222,7 +224,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> affectedClasses = new HashSet<>();
 
         if (selectBasedOnMethodsCall) {
-            this.affectedTestClasses = affectedTests;
+            // this.affectedTestClasses = affectedTests;
             Map<String, List<String>> testClassToMethod = new HashMap<>();
             List<SootMethod> entryPoints = new ArrayList<>();
             List<String> currentTests = super.getTests(project, this.runner.framework());
@@ -245,6 +247,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
                 // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
                 if (sootNewAffectedClasses == null && removeBasedOnMethodsCall) {
+                    affectedTests.remove(testClass);
                     affectedClasses.remove(testClass);
                 }
                 else {
@@ -267,6 +270,10 @@ public class IncDetectorPlugin extends DetectorPlugin {
                                 // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
                                 reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
                                 // System.out.println("reachableClassesFromAdditionalAffectedTestClass: " + reachableClassesFromAdditionalAffectedTestClass);
+                                // remove the test class that could not reach any classes that contain static fields
+                                if (reachableClassesFromAdditionalAffectedTestClass == null && removeBasedOnMethodsCall) {
+                                    additionalTests.remove(additionalAffectedTestClass);
+                                }
                                 additionalAffectedTestClassesSet.put(additionalAffectedTestClass, reachableClassesFromAdditionalAffectedTestClass);
                             }
                             if (reachableClassesFromAdditionalAffectedTestClass.contains(affectedClass)) {
