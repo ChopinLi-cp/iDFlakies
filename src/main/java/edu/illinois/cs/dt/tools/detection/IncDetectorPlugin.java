@@ -250,7 +250,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
 
             for (String testClass : testClassToMethod.keySet()) {
-                // System.out.println("GOING TO RUN SOOT ANALYSIS FOR TC: " + testClass);
+                System.out.println("GOING TO RUN SOOT ANALYSIS FOR TC: " + testClass);
                 // long startTime = System.currentTimeMillis();
                 // if (affectedTests.contains(testClass)) {
                 //     continue;
