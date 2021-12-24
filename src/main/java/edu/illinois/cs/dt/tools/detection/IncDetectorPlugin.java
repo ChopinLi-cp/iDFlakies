@@ -208,7 +208,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 return allTests;
             }
             else {
-                System.out.println("REMOVE OPTIONS0");
+                // System.out.println("REMOVE OPTIONS0");
                 affectedTests = allTests;
             }
         }
@@ -245,18 +245,18 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
 
             for (String testClass : testClassToMethod.keySet()) {
-                System.out.println("GOING TO RUN SOOT ANALYSIS FOR TC: " + testClass);
+                // System.out.println("GOING TO RUN SOOT ANALYSIS FOR TC: " + testClass);
                 // long startTime = System.currentTimeMillis();
                 // if (affectedTests.contains(testClass)) {
                 //     continue;
                 // }
-                System.out.println("CONTAIN OR NOT" + affectedTests.contains(testClass));
+                // System.out.println("CONTAIN OR NOT" + affectedTests.contains(testClass));
                 if(affectedTests.contains(testClass)) {
                     Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
                     // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
-                    System.out.println("THE SIZE of sootNewAffectedClasses: " + sootNewAffectedClasses.size());
+                    // System.out.println("THE SIZE of sootNewAffectedClasses: " + sootNewAffectedClasses.size());
                     if (sootNewAffectedClasses.isEmpty() && removeBasedOnMethodsCall) {
-                        System.out.println("REMOVE OPTIONS1");
+                        // System.out.println("REMOVE OPTIONS1");
                         affectedTests.remove(testClass);
                         affectedClasses.remove(testClass);
                     } else {
@@ -281,9 +281,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
                                 reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
                                 // System.out.println("reachableClassesFromAdditionalAffectedTestClass: " + reachableClassesFromAdditionalAffectedTestClass);
                                 // remove the test class that could not reach any classes that contain static fields
-                                System.out.println("THE SIZE of sootNewAffectedClasses: " + reachableClassesFromAdditionalAffectedTestClass.size());
+                                // System.out.println("THE SIZE of sootNewAffectedClasses: " + reachableClassesFromAdditionalAffectedTestClass.size());
                                 if (reachableClassesFromAdditionalAffectedTestClass.isEmpty() && removeBasedOnMethodsCall) {
-                                    System.out.println("REMOVE OPTIONS2");
+                                    // System.out.println("REMOVE OPTIONS2");
                                     additionalTests.remove(additionalAffectedTestClass);
                                     affectedTests.remove(additionalAffectedTestClass);
                                 }
