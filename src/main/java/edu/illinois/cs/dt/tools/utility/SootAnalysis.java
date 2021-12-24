@@ -241,13 +241,13 @@ public class SootAnalysis {
         // }
         // System.out.println("");
 
-        for (SootField sf: sc.getFields()){
-            // System.out.println(sf.getSignature());
-            if (sf.isStatic()) {
-                affectedClasses.add(clzName);
-                break;
-            }
-        }
+//        for (SootField sf: sc.getFields()){
+//            // System.out.println(sf.getSignature());
+//            if (sf.isStatic()) {
+//                affectedClasses.add(clzName);
+//                break;
+//            }
+//        }
         return affectedClasses;
     }
 }
