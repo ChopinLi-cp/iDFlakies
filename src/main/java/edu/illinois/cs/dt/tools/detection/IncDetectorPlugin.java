@@ -213,15 +213,10 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
 
-        if (!selectMore) {
+        if (!selectMore || loadables == null) {
             return affectedTests;
         }
-
-        if (loadables == null) {
-            if (!removeBasedOnMethodsCall) {
-                return affectedTests;
-            }
-        }
+        
 
         Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
 
