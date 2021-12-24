@@ -189,6 +189,30 @@ public class SootAnalysis {
         for(Iterator<SootMethod> it = qr; it.hasNext(); ) {
             try {
                 SootMethod reachableMethod = it.next();
+                // System.out.println("reachableMethod: " + reachableMethod.getSignature());
+                if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
+                    continue;
+                }
+                if(reachableMethod.isPhantom()) {
+                    continue;
+                }
+                JimpleBody reachableMethodBody = (JimpleBody) reachableMethod.retrieveActiveBody();
+                c = 0;
+                for (Unit u : reachableMethodBody.getUnits()) {
+                    c++;
+                    Stmt stmt = (Stmt) u;
+                    if (stmt.containsFieldRef())
+                        reportFieldRefInfo(stmt, affectedClasses);
+                }
+            } catch (Exception e) {
+                // System.out.println("LIKELY ERROR: cannot get resident body for phantom method");
+                e.printStackTrace();
+            }
+        }
+
+        for(SootMethod reachableMethod: entryPoints) {
+            try {
+                // System.out.println("reachableMethod: " + reachableMethod.getSignature());
                 if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
                     continue;
                 }
@@ -217,6 +241,7 @@ public class SootAnalysis {
         // System.out.println("");
 
         for (SootField sf: sc.getFields()){
+            System.out.println(sf.getSignature());
             if (sf.isStatic()) {
                 affectedClasses.add(clzName);
                 break;
