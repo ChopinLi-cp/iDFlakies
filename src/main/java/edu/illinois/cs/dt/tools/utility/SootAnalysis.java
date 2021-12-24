@@ -215,6 +215,12 @@ public class SootAnalysis {
         //     System.out.print(item + ";");
         // }
         // System.out.println("");
+
+        for (SootField sf: sc.getFields()){
+            if (sf.isStatic()) {
+                affectedClasses.add(clzName);
+            }
+        }
         return affectedClasses;
     }
 }
