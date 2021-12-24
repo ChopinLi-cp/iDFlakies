@@ -219,6 +219,7 @@ public class SootAnalysis {
         for (SootField sf: sc.getFields()){
             if (sf.isStatic()) {
                 affectedClasses.add(clzName);
+                break;
             }
         }
         return affectedClasses;
