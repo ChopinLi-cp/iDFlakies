@@ -82,6 +82,7 @@ public class SootAnalysis {
         Options.v().set_output_format(Options.output_format_jimple);
         // Options.v().set_process_dir(Collections.singletonList(sourceDirectory));
         Options.v().set_whole_program(true);
+        Options.v().allow_phantom_refs(); // especially for wildfly
         entryPoints.clear();
 
     }
