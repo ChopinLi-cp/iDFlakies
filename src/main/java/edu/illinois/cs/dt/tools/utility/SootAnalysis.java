@@ -82,7 +82,7 @@ public class SootAnalysis {
         Options.v().set_output_format(Options.output_format_jimple);
         // Options.v().set_process_dir(Collections.singletonList(sourceDirectory));
         Options.v().set_whole_program(true);
-        Options.v().set_allow_phantom_refs(true); // especially for wildfly
+        // Options.v().set_allow_phantom_refs(true); // especially for wildfly
         entryPoints.clear();
 
     }
@@ -190,6 +190,9 @@ public class SootAnalysis {
             try {
                 SootMethod reachableMethod = it.next();
                 if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
+                    continue;
+                }
+                if(reachableMethod.getDeclaringClass().isPhantomClass()) {
                     continue;
                 }
                 JimpleBody reachableMethodBody = (JimpleBody) reachableMethod.retrieveActiveBody();
