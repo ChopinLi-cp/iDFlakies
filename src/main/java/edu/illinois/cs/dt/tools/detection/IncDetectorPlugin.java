@@ -281,7 +281,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                                 // System.out.println("reachableClassesFromAdditionalAffectedTestClass: " + reachableClassesFromAdditionalAffectedTestClass);
                                 // remove the test class that could not reach any classes that contain static fields
                                 System.out.println("THE SIZE of sootNewAffectedClasses: " + reachableClassesFromAdditionalAffectedTestClass.size());
-                                if (reachableClassesFromAdditionalAffectedTestClass == null && removeBasedOnMethodsCall) {
+                                if (reachableClassesFromAdditionalAffectedTestClass.isEmpty() && removeBasedOnMethodsCall) {
                                     System.out.println("REMOVE OPTIONS2");
                                     additionalTests.remove(additionalAffectedTestClass);
                                 }
