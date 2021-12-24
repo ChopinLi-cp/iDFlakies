@@ -205,7 +205,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
         if ( selectAll || affectedTests.size() == allTests.size() ) {
             if (!removeBasedOnMethodsCall) {
-                return allTests;
+            return allTests;
             }
         }
         if (!selectMore || loadables == null) {

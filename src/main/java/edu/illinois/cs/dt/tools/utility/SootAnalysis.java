@@ -192,7 +192,7 @@ public class SootAnalysis {
                 if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
                     continue;
                 }
-                if(reachableMethod.getDeclaringClass().isPhantomClass()) {
+                if(reachableMethod.isPhantom()) {
                     continue;
                 }
                 JimpleBody reachableMethodBody = (JimpleBody) reachableMethod.retrieveActiveBody();
