@@ -250,6 +250,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 // if (affectedTests.contains(testClass)) {
                 //     continue;
                 // }
+                System.out.println("CONTAIN OR NOT" + affectedTests.contains(testClass));
                 if(affectedTests.contains(testClass)) {
                     Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
                     // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
@@ -284,6 +285,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                                 if (reachableClassesFromAdditionalAffectedTestClass.isEmpty() && removeBasedOnMethodsCall) {
                                     System.out.println("REMOVE OPTIONS2");
                                     additionalTests.remove(additionalAffectedTestClass);
+                                    affectedTests.remove(additionalAffectedTestClass);
                                 }
                                 additionalAffectedTestClassesSet.put(additionalAffectedTestClass, reachableClassesFromAdditionalAffectedTestClass);
                             }
