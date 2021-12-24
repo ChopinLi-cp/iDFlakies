@@ -244,6 +244,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 testClassToMethod.get(className).add(test);
             }
 
+            Map<String, Set<String>> SootAnalysisTestClassesToClassesSet = new HashMap<>();
             for (String testClass : testClassToMethod.keySet()) {
                 // System.out.println("GOING TO RUN SOOT ANALYSIS FOR TC: " + testClass);
                 // long startTime = System.currentTimeMillis();
@@ -261,11 +262,12 @@ public class IncDetectorPlugin extends DetectorPlugin {
                         affectedClasses.remove(testClass);
                     } else {
                         affectedClasses.addAll(sootNewAffectedClasses);
+                        SootAnalysisTestClassesToClassesSet.put(testClass, sootNewAffectedClasses);
                     }
                 }
             }
 
-            Map<String, Set<String>> additionalAffectedTestClassesSet = new HashMap<>();
+            // Map<String, Set<String>> additionalAffectedTestClassesSet = new HashMap<>();
             for (String affectedClass : affectedClasses) {
                 if (reverseTransitiveClosure.containsKey(affectedClass)) {
                     Set<String> additionalAffectedTestClasses = reverseTransitiveClosure.get(affectedClass);
@@ -273,8 +275,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
                     for (String additionalAffectedTestClass : additionalAffectedTestClasses) {
                         if(selectBasedOnMethodsCallUpgrade) {
                             Set<String> reachableClassesFromAdditionalAffectedTestClass;
-                            if(additionalAffectedTestClassesSet.containsKey(additionalAffectedTestClass)) {
-                                reachableClassesFromAdditionalAffectedTestClass = additionalAffectedTestClassesSet.get(additionalAffectedTestClass);
+                            if(SootAnalysisTestClassesToClassesSet.containsKey(additionalAffectedTestClass)) {
+                                reachableClassesFromAdditionalAffectedTestClass = SootAnalysisTestClassesToClassesSet.get(additionalAffectedTestClass);
                             }
                             else {
                                 // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
@@ -287,7 +289,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                                     additionalTests.remove(additionalAffectedTestClass);
                                     affectedTests.remove(additionalAffectedTestClass);
                                 }
-                                additionalAffectedTestClassesSet.put(additionalAffectedTestClass, reachableClassesFromAdditionalAffectedTestClass);
+                                SootAnalysisTestClassesToClassesSet.put(additionalAffectedTestClass, reachableClassesFromAdditionalAffectedTestClass);
                             }
                             if (reachableClassesFromAdditionalAffectedTestClass.contains(affectedClass)) {
                                 // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
