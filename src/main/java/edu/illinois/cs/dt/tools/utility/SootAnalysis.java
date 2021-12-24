@@ -209,12 +209,12 @@ public class SootAnalysis {
             }
         }
 
-        // System.out.println("-------------------");
-        // System.out.println("All the classes that could be accessed through accessing corresponding static fields. (" + clsName + ");");
-        // for(String item: affectedClasses) {
-        //     System.out.print(item + ";");
-        // }
-        // System.out.println("");
+         System.out.println("-------------------");
+         System.out.println("All the classes that could be accessed through accessing corresponding static fields. (" + clsName + ");");
+         for(String item: affectedClasses) {
+             System.out.print(item + ";");
+         }
+         System.out.println("");
         return affectedClasses;
     }
 }
