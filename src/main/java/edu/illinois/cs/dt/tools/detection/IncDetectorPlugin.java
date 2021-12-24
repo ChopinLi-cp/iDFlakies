@@ -204,13 +204,13 @@ public class IncDetectorPlugin extends DetectorPlugin {
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
         if ( selectAll || affectedTests.size() == allTests.size() ) {
-            // if (!removeBasedOnMethodsCall) {
+            if (!removeBasedOnMethodsCall) {
                 return allTests;
-            // }
-            // else {
-                // System.out.println("REMOVE OPTIONS0");
-                // affectedTests = allTests;
-            // }
+            }
+            else {
+                 // System.out.println("REMOVE OPTIONS0");
+                affectedTests = allTests;
+            }
         }
 
         if (!selectMore || loadables == null) {
