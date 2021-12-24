@@ -126,7 +126,7 @@ public class SootAnalysis {
         return hasAnnotation;
     }
 
-    public static Set<String> analysis(String srcDir, String clsName) {
+    public static Set<String> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod) {
         Set<String> affectedClasses = new HashSet<>();
 
         sourceDirectory = srcDir;
