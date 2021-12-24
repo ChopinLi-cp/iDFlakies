@@ -216,7 +216,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         if (!selectMore || loadables == null) {
             return affectedTests;
         }
-        
+
 
         Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
 
@@ -250,15 +250,16 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 // if (affectedTests.contains(testClass)) {
                 //     continue;
                 // }
-                Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
-                // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
-                if (sootNewAffectedClasses == null && removeBasedOnMethodsCall) {
-                    System.out.println("REMOVE OPTIONS1");
-                    affectedTests.remove(testClass);
-                    affectedClasses.remove(testClass);
-                }
-                else {
-                    affectedClasses.addAll(sootNewAffectedClasses);
+                if(affectedTests.contains(testClass)) {
+                    Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
+                    // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
+                    if (sootNewAffectedClasses == null && removeBasedOnMethodsCall) {
+                        System.out.println("REMOVE OPTIONS1");
+                        affectedTests.remove(testClass);
+                        affectedClasses.remove(testClass);
+                    } else {
+                        affectedClasses.addAll(sootNewAffectedClasses);
+                    }
                 }
             }
 
