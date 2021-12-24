@@ -126,7 +126,7 @@ public class SootAnalysis {
         return hasAnnotation;
     }
 
-    public static Set<String> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod) {
+    public static Set<String> analysis(String srcDir, String clsName) {
         Set<String> affectedClasses = new HashSet<>();
 
         sourceDirectory = srcDir;
@@ -242,7 +242,7 @@ public class SootAnalysis {
         // System.out.println("");
 
         for (SootField sf: sc.getFields()){
-            System.out.println(sf.getSignature());
+            // System.out.println(sf.getSignature());
             if (sf.isStatic()) {
                 affectedClasses.add(clzName);
                 break;
