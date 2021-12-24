@@ -212,8 +212,15 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 affectedTests = allTests;
             }
         }
-        if (!selectMore || loadables == null) {
+
+        if (!selectMore ||) {
             return affectedTests;
+        }
+
+        if (loadables == null) {
+            if (!removeBasedOnMethodsCall) {
+                return affectedTests;
+            }
         }
 
         Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
