@@ -126,7 +126,7 @@ public class SootAnalysis {
         return hasAnnotation;
     }
 
-    public static Set<String> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod) {
+    public static Set<String> analysis(String srcDir, String clsName) {
         Set<String> affectedClasses = new HashSet<>();
 
         sourceDirectory = srcDir;
@@ -154,11 +154,12 @@ public class SootAnalysis {
             e.printStackTrace();
         }
         // Add the tests
-        for (String test : testClassToMethod.get(clzName)) {
+        for (SootMethod sootMethod : sc.getMethods()) {
             try {
-                entryPoints.add(sc.getMethodByName(test));
-            } catch (Exception e) {
-
+                entryPoints.add(sootMethod);
+            } catch (Exception e){
+                // System.out.println("BUG EXISTS WHEN DETECTING @BEFORE ANNOTATIONS!");
+                e.printStackTrace();
             }
         }
         for (SootMethod sootMethod : sc.getMethods()) {
