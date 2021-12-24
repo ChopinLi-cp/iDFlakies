@@ -208,6 +208,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 return allTests;
             }
             else {
+                System.out.println("REMOVE OPTIONS0");
                 affectedTests = allTests;
             }
         }
@@ -250,6 +251,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
                 // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
                 if (sootNewAffectedClasses == null && removeBasedOnMethodsCall) {
+                    System.out.println("REMOVE OPTIONS1");
                     affectedTests.remove(testClass);
                     affectedClasses.remove(testClass);
                 }
