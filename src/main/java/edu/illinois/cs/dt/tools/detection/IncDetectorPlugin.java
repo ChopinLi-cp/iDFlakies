@@ -213,7 +213,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
 
-        if (!selectMore ||) {
+        if (!selectMore) {
             return affectedTests;
         }
 
