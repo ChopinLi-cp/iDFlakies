@@ -253,7 +253,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 // }
                 // System.out.println("CONTAIN OR NOT" + affectedTests.contains(testClass));
                 if(affectedTests.contains(testClass)) {
-                    Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass);
+                    Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
                     // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
                     // System.out.println("THE SIZE of sootNewAffectedClasses: " + sootNewAffectedClasses.size());
                     if (sootNewAffectedClasses.isEmpty() && removeBasedOnMethodsCall) {
@@ -280,7 +280,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                             }
                             else {
                                 // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
-                                reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass);
+                                reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
                                 // System.out.println("reachableClassesFromAdditionalAffectedTestClass: " + reachableClassesFromAdditionalAffectedTestClass);
                                 // remove the test class that could not reach any classes that contain static fields
                                 // System.out.println("THE SIZE of sootNewAffectedClasses: " + reachableClassesFromAdditionalAffectedTestClass.size());

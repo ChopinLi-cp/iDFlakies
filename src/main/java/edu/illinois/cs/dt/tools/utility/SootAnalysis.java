@@ -126,7 +126,7 @@ public class SootAnalysis {
         return hasAnnotation;
     }
 
-    public static Set<String> analysis(String srcDir, String clsName) {
+    public static Set<String> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod) {
         Set<String> affectedClasses = new HashSet<>();
 
         sourceDirectory = srcDir;
@@ -154,11 +154,11 @@ public class SootAnalysis {
             e.printStackTrace();
         }
         // Add the tests
-        for (SootMethod sootMethod : sc.getMethods()) {
+        for (String test : testClassToMethod.get(clzName)) {
             try {
-                entryPoints.add(sootMethod);
-            } catch (Exception e){
-                // System.out.println("BUG EXISTS WHEN DETECTING @BEFORE ANNOTATIONS!");
+                String testName = test.substring(test.lastIndexOf(".") + 1);
+                entryPoints.add(sc.getMethodByName(testName));
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
@@ -190,30 +190,6 @@ public class SootAnalysis {
         for(Iterator<SootMethod> it = qr; it.hasNext(); ) {
             try {
                 SootMethod reachableMethod = it.next();
-                // System.out.println("reachableMethod: " + reachableMethod.getSignature());
-                if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
-                    continue;
-                }
-                if(reachableMethod.isPhantom()) {
-                    continue;
-                }
-                JimpleBody reachableMethodBody = (JimpleBody) reachableMethod.retrieveActiveBody();
-                c = 0;
-                for (Unit u : reachableMethodBody.getUnits()) {
-                    c++;
-                    Stmt stmt = (Stmt) u;
-                    if (stmt.containsFieldRef())
-                        reportFieldRefInfo(stmt, affectedClasses);
-                }
-            } catch (Exception e) {
-                // System.out.println("LIKELY ERROR: cannot get resident body for phantom method");
-                e.printStackTrace();
-            }
-        }
-
-        for(SootMethod reachableMethod: entryPoints) {
-            try {
-                // System.out.println("reachableMethod: " + reachableMethod.getSignature());
                 if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
                     continue;
                 }
