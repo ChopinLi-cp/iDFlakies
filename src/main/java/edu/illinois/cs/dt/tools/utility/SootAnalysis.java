@@ -96,6 +96,9 @@ public class SootAnalysis {
             public void caseStaticFieldRef(StaticFieldRef v) {
                 // A static field reference
                 // System.out.println("A static field reference: " + v.getFieldRef() + " " + v.getFieldRef().isStatic());
+                if (SootUtil.inLibrary(v.getFieldRef().declaringClass().getName()) || inExcludeList(v.getFieldRef().declaringClass().getName())) {
+                    return;
+                }
                 affectedClasses.add(v.getFieldRef().declaringClass().getName());
                 reachStaticFields[0] = true;
                 // affectedClasses.add(v.getField().getName());
