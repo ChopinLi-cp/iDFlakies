@@ -333,7 +333,7 @@ public class SootAnalysis {
         else {
             for (String test : testClassToMethod.get(clzName)) {
                 tmpEntryPoints.clear();
-                System.out.println("CLASSTOTEST: " + clzName + "; " + test );
+                // System.out.println("CLASSTOTEST: " + clzName + "; " + test );
                 try {
                     String testName = test.substring(test.lastIndexOf(".") + 1);
                     SootMethod sm = sc.getMethodByName(testName);
@@ -341,7 +341,7 @@ public class SootAnalysis {
                     boolean reachStaticFields = detectAffectedClasses(callGraph, tmpEntryPoints, affectedClasses);
                     // tmpEntryPoints.remove(sm);
                     if (reachStaticFields) {
-                        System.out.println("CLASSTOTEST2: " + clzName + "; " + test );
+                        // System.out.println("CLASSTOTEST2: " + clzName + "; " + test );
                         selectedTests.add(test);
                     }
                 } catch (Exception e) {
