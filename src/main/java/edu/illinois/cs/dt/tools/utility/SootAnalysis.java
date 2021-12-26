@@ -143,39 +143,30 @@ public class SootAnalysis {
         sc.setApplicationClass();
         Scene.v().loadNecessaryClasses();
 
-        try {
-            // Get clinits
-            for (SootMethod sm : EntryPoints.v().clinitsOf(sc)) {
-                entryPoints.add(sm);
-            }
-        } catch (Exception e) {
-            // System.out.println("CLINIT METHOD MAY NOT EXIST!");
-            e.printStackTrace();
-        }
-        try {
-            SootMethod init = sc.getMethod("<init>", new ArrayList<>());
-            entryPoints.add(init);
-        } catch (Exception e) {
-            // System.out.println("INIT METHOD MAY NOT EXIST!");
-            e.printStackTrace();
-        }
+        putEntryPoints(sc, entryPoints);
+
         // Add the tests
         for (String test : testClassToMethod.get(clzName)) {
+            String testName = test.substring(test.lastIndexOf(".") + 1);
             try {
-                String testName = test.substring(test.lastIndexOf(".") + 1);
                 entryPoints.add(sc.getMethodByName(testName));
             } catch (Exception e) {
                 e.printStackTrace();
-            }
-        }
-        for (SootMethod sootMethod : sc.getMethods()) {
-            try {
-                if (hasBeforeOrAfterAnnotation(sootMethod)) {
-                    entryPoints.add(sootMethod);
+                if (sc.hasSuperclass()) {
+                    // System.out.println("sc.hasSuperclass()");
+                    SootClass upperSootClass = sc.getSuperclass();
+                    try {
+                        entryPoints.add(upperSootClass.getMethodByName(testName));
+                        if(!Scene.v().containsClass(upperSootClass.getName())) {
+                            Scene.v().addClass(upperSootClass);
+                            Scene.v().forceResolve(upperSootClass.getName(), BODIES);
+                            upperSootClass.setApplicationClass();
+                            putEntryPoints(upperSootClass, entryPoints);
+                        }
+                    } catch (Exception methodNotFoundException) {
+                        methodNotFoundException.printStackTrace();
+                    }
                 }
-            } catch (Exception e){
-                // System.out.println("BUG EXISTS WHEN DETECTING @BEFORE ANNOTATIONS!");
-                e.printStackTrace();
             }
         }
         Scene.v().setEntryPoints(entryPoints);
@@ -247,6 +238,7 @@ public class SootAnalysis {
         for(Iterator<SootMethod> it = qr; it.hasNext(); ) {
             try {
                 SootMethod reachableMethod = it.next();
+                /// System.out.println("REACH: " + reachableMethod.getName());
                 if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
                     continue;
                 }
@@ -271,6 +263,35 @@ public class SootAnalysis {
         return flag;
     }
 
+    public static void putEntryPoints(SootClass sc, List<SootMethod> ep) {
+        try {
+            // Get clinits
+            for (SootMethod sm : EntryPoints.v().clinitsOf(sc)) {
+                ep.add(sm);
+            }
+        } catch (Exception e) {
+            // System.out.println("CLINIT METHOD MAY NOT EXIST!");
+            e.printStackTrace();
+        }
+        try {
+            SootMethod init = sc.getMethod("<init>", new ArrayList<>());
+            ep.add(init);
+        } catch (Exception e) {
+            // System.out.println("INIT METHOD MAY NOT EXIST!");
+            e.printStackTrace();
+        }
+        for (SootMethod sootMethod : sc.getMethods()) {
+            try {
+                if (hasBeforeOrAfterAnnotation(sootMethod)) {
+                    ep.add(sootMethod);
+                }
+            } catch (Exception e){
+                // System.out.println("BUG EXISTS WHEN DETECTING @BEFORE ANNOTATIONS!");
+                e.printStackTrace();
+            }
+        }
+    }
+
     public static Set<String> analysisOnMethods(String srcDir, String clsName, Map<String, List<String>> testClassToMethod, List<String> selectedTests) {
         Set<String> affectedClasses = new HashSet<>();
 
@@ -284,42 +305,32 @@ public class SootAnalysis {
         sc.setApplicationClass();
         Scene.v().loadNecessaryClasses();
 
-        try {
-            // Get clinits
-            for (SootMethod sm : EntryPoints.v().clinitsOf(sc)) {
-                entryPoints.add(sm);
-                tmpEntryPoints.add(sm);
-            }
-        } catch (Exception e) {
-            // System.out.println("CLINIT METHOD MAY NOT EXIST!");
-            e.printStackTrace();
-        }
-        try {
-            SootMethod init = sc.getMethod("<init>", new ArrayList<>());
-            entryPoints.add(init);
-            tmpEntryPoints.add(init);
-        } catch (Exception e) {
-            // System.out.println("INIT METHOD MAY NOT EXIST!");
-            e.printStackTrace();
-        }
+        putEntryPoints(sc, entryPoints);
+        putEntryPoints(sc, tmpEntryPoints);
+
         // Add the tests
         for (String test : testClassToMethod.get(clzName)) {
+            String testName = test.substring(test.lastIndexOf(".") + 1);
             try {
-                String testName = test.substring(test.lastIndexOf(".") + 1);
                 entryPoints.add(sc.getMethodByName(testName));
             } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        for (SootMethod sootMethod : sc.getMethods()) {
-            try {
-                if (hasBeforeOrAfterAnnotation(sootMethod)) {
-                    entryPoints.add(sootMethod);
-                    tmpEntryPoints.add(sootMethod);
+                // e.printStackTrace();
+                if (sc.hasSuperclass()) {
+                    // System.out.println("sc.hasSuperclass()");
+                    SootClass upperSootClass = sc.getSuperclass();
+                    try {
+                        entryPoints.add(upperSootClass.getMethodByName(testName));
+                        if(!Scene.v().containsClass(upperSootClass.getName())) {
+                            Scene.v().addClass(upperSootClass);
+                            Scene.v().forceResolve(upperSootClass.getName(), BODIES);
+                            upperSootClass.setApplicationClass();
+                            putEntryPoints(upperSootClass, entryPoints);
+                            putEntryPoints(upperSootClass, tmpEntryPoints);
+                        }
+                    } catch (Exception methodNotFoundException) {
+                        methodNotFoundException.printStackTrace();
+                    }
                 }
-            } catch (Exception e){
-                // System.out.println("BUG EXISTS WHEN DETECTING @BEFORE ANNOTATIONS!");
-                e.printStackTrace();
             }
         }
         Scene.v().setEntryPoints(entryPoints);
@@ -336,19 +347,28 @@ public class SootAnalysis {
         else {
             for (String test : testClassToMethod.get(clzName)) {
                 tmpEntryPoints.clear();
+                String testName = test.substring(test.lastIndexOf(".") + 1);
                 // System.out.println("CLASSTOTEST: " + clzName + "; " + test );
                 try {
-                    String testName = test.substring(test.lastIndexOf(".") + 1);
                     SootMethod sm = sc.getMethodByName(testName);
                     tmpEntryPoints.add(sm);
-                    boolean reachStaticFields = detectAffectedClasses(callGraph, tmpEntryPoints, affectedClasses);
-                    // tmpEntryPoints.remove(sm);
-                    if (reachStaticFields) {
-                        // System.out.println("CLASSTOTEST2: " + clzName + "; " + test );
-                        selectedTests.add(test);
-                    }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    // e.printStackTrace();
+                    if (sc.hasSuperclass()) {
+                        // System.out.println("sc.hasSuperclass()");
+                        SootClass upperSootClass = sc.getSuperclass();
+                        try {
+                            tmpEntryPoints.add(upperSootClass.getMethodByName(testName));
+                        } catch (Exception methodNotFoundException) {
+                            methodNotFoundException.printStackTrace();
+                        }
+                    }
+                }
+                boolean reachStaticFields = detectAffectedClasses(callGraph, tmpEntryPoints, affectedClasses);
+                // tmpEntryPoints.remove(sm);
+                if (reachStaticFields) {
+                    // System.out.println("CLASSTOTEST2: " + clzName + "; " + test );
+                    selectedTests.add(test);
                 }
             }
         }
