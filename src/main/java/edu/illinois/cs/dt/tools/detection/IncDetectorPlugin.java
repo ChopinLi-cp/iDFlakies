@@ -478,7 +478,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             TestFramework testFramework) throws IOException {
         System.out.println("SELECTED TESTS SIZE: " + this.selectedTests.size());
         List<String> tests;
-        if (fineGranularity) {
+        if (fineGranularity && this.selectedTests != null) {
             tests = this.selectedTests;
         } else {
             tests = getOriginalOrder(project, testFramework, true);
