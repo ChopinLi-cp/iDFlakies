@@ -87,7 +87,8 @@ public class SootAnalysis {
 
     }
 
-    private static void reportFieldRefInfo(Stmt stmt, final Set<String> affectedClasses) {
+    private static boolean reportFieldRefInfo(Stmt stmt, final Set<String> affectedClasses) {
+        final boolean[] reachStaticFields = {false};
         FieldRef fieldRef = stmt.getFieldRef();
         // System.out.println("FIELDREF: " + fieldRef);
         fieldRef.apply(new AbstractRefSwitch() {
@@ -96,6 +97,7 @@ public class SootAnalysis {
                 // A static field reference
                 // System.out.println("A static field reference: " + v.getFieldRef() + " " + v.getFieldRef().isStatic());
                 affectedClasses.add(v.getFieldRef().declaringClass().getName());
+                reachStaticFields[0] = true;
                 // affectedClasses.add(v.getField().getName());
             }
 
@@ -105,6 +107,7 @@ public class SootAnalysis {
                 // affectedClasses.add(v.getFieldRef().declaringClass().getName());
             }
         });
+        return reachStaticFields[0];
     }
 
     private static boolean hasBeforeOrAfterAnnotation(SootMethod sootMethod) {
@@ -226,5 +229,129 @@ public class SootAnalysis {
 //        }
         return affectedClasses;
     }
+
+    public static boolean detectAffectedClasses(CallGraph callGraph, List<SootMethod> tmpEntryPoints, Set<String> affectedClasses) {
+        boolean flag = false;
+
+        ReachableMethods rm = new ReachableMethods(callGraph, tmpEntryPoints);
+        rm.update();
+        QueueReader qr = rm.listener();
+
+        // System.out.println("-------------------");
+        // System.out.println("-----Reachable Methods-----");
+
+        // qr = rm.listener();
+        for(Iterator<SootMethod> it = qr; it.hasNext(); ) {
+            try {
+                SootMethod reachableMethod = it.next();
+                if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
+                    continue;
+                }
+                if(reachableMethod.isPhantom()) {
+                    continue;
+                }
+                JimpleBody reachableMethodBody = (JimpleBody) reachableMethod.retrieveActiveBody();
+                for (Unit u : reachableMethodBody.getUnits()) {
+                    Stmt stmt = (Stmt) u;
+                    if (stmt.containsFieldRef()) {
+                        boolean reachStaticFields = reportFieldRefInfo(stmt, affectedClasses);
+                        if (reachStaticFields) {
+                            flag = true;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // System.out.println("LIKELY ERROR: cannot get resident body for phantom method");
+                e.printStackTrace();
+            }
+        }
+        return flag;
+    }
+
+    public static Set<String> analysisOnMethods(String srcDir, String clsName, Map<String, List<String>> testClassToMethod, List<String> selectedTests) {
+        Set<String> affectedClasses = new HashSet<>();
+
+        List<SootMethod> tmpEntryPoints = new ArrayList();
+
+        sourceDirectory = srcDir;
+        clzName = clsName;
+
+        setupSoot();
+        SootClass sc = Scene.v().forceResolve(clzName, BODIES);// Scene.v().loadClassAndSupport(clsName);
+        sc.setApplicationClass();
+        Scene.v().loadNecessaryClasses();
+
+        try {
+            // Get clinits
+            for (SootMethod sm : EntryPoints.v().clinitsOf(sc)) {
+                entryPoints.add(sm);
+                tmpEntryPoints.add(sm);
+            }
+        } catch (Exception e) {
+            // System.out.println("CLINIT METHOD MAY NOT EXIST!");
+            e.printStackTrace();
+        }
+        try {
+            SootMethod init = sc.getMethod("<init>", new ArrayList<>());
+            entryPoints.add(init);
+            tmpEntryPoints.add(init);
+        } catch (Exception e) {
+            // System.out.println("INIT METHOD MAY NOT EXIST!");
+            e.printStackTrace();
+        }
+        // Add the tests
+        for (String test : testClassToMethod.get(clzName)) {
+            try {
+                String testName = test.substring(test.lastIndexOf(".") + 1);
+                entryPoints.add(sc.getMethodByName(testName));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        for (SootMethod sootMethod : sc.getMethods()) {
+            try {
+                if (hasBeforeOrAfterAnnotation(sootMethod)) {
+                    entryPoints.add(sootMethod);
+                    tmpEntryPoints.add(sootMethod);
+                }
+            } catch (Exception e){
+                // System.out.println("BUG EXISTS WHEN DETECTING @BEFORE ANNOTATIONS!");
+                e.printStackTrace();
+            }
+        }
+        Scene.v().setEntryPoints(entryPoints);
+        PackManager.v().runPacks();
+
+        // Call graph
+        CallGraph callGraph = Scene.v().getCallGraph();
+        detectAffectedClasses(callGraph, tmpEntryPoints, affectedClasses);
+
+        if (!affectedClasses.isEmpty()) {
+            selectedTests.addAll(testClassToMethod.get(clzName));
+            return affectedClasses;
+        }
+        else {
+            for (String test : testClassToMethod.get(clzName)) {
+                tmpEntryPoints.clear();
+                System.out.println("CLASSTOTEST: " + clzName + "; " + test );
+                try {
+                    String testName = test.substring(test.lastIndexOf(".") + 1);
+                    SootMethod sm = sc.getMethodByName(testName);
+                    tmpEntryPoints.add(sm);
+                    boolean reachStaticFields = detectAffectedClasses(callGraph, tmpEntryPoints, affectedClasses);
+                    // tmpEntryPoints.remove(sm);
+                    if (reachStaticFields) {
+                        System.out.println("CLASSTOTEST2: " + clzName + "; " + test );
+                        selectedTests.add(test);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        return affectedClasses;
+    }
+
 }
 

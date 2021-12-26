@@ -1,16 +1,11 @@
 package edu.illinois.cs.dt.tools.detection;
 
-import edu.illinois.cs.dt.tools.runner.InstrumentingSmartRunner;
 import edu.illinois.cs.dt.tools.utility.ErrorLogger;
 import edu.illinois.cs.dt.tools.utility.PathManager;
 import edu.illinois.cs.dt.tools.utility.SootAnalysis;
 import edu.illinois.cs.testrunner.configuration.Configuration;
-import edu.illinois.cs.testrunner.coreplugin.TestPluginUtil;
 import edu.illinois.cs.testrunner.data.framework.TestFramework;
-import edu.illinois.cs.testrunner.runner.Runner;
-import edu.illinois.cs.testrunner.runner.RunnerFactory;
 import edu.illinois.cs.testrunner.util.ProjectWrapper;
-import edu.illinois.starts.constants.StartsConstants;
 import edu.illinois.starts.data.ZLCFormat;
 import edu.illinois.starts.enums.DependencyFormat;
 import edu.illinois.starts.helpers.*;
@@ -18,15 +13,10 @@ import edu.illinois.starts.maven.AgentLoader;
 import edu.illinois.starts.util.Logger;
 import edu.illinois.starts.util.Pair;
 import edu.illinois.yasgl.DirectedGraph;
-import org.apache.maven.artifact.DependencyResolutionRequiredException;
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.surefire.AbstractSurefireMojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.project.MavenProject;
 import org.apache.maven.surefire.booter.Classpath;
 import org.apache.maven.surefire.booter.SurefireExecutionException;
-import soot.EntryPoints;
-import soot.SootClass;
 import soot.SootMethod;
 
 import java.io.File;
@@ -36,7 +26,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.logging.Level;
 
@@ -131,9 +120,13 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     protected boolean removeBasedOnMethodsCall;
 
+    protected boolean fineGranularity;
+
     protected boolean detectOrNot;
 
     private Set<String> affectedTestClasses;
+
+    protected List<String> selectedTests;
 
     @Override
     public void execute(final ProjectWrapper project) {
@@ -235,6 +228,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
             List<SootMethod> entryPoints = new ArrayList<>();
             List<String> currentTests = super.getTests(project, this.runner.framework());
 
+            // Using fine granularity (methods level)
+            this.selectedTests = new ArrayList<>();
+
             String delimiter = this.runner.framework().getDelimiter();
             for (String test : currentTests) {
                 String className = test.substring(0, test.lastIndexOf(delimiter));
@@ -253,7 +249,13 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 // }
                 // System.out.println("CONTAIN OR NOT" + affectedTests.contains(testClass));
                 if(affectedTests.contains(testClass)) {
-                    Set<String> sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
+                    Set<String> sootNewAffectedClasses = new HashSet<>();
+                    if (fineGranularity) {
+                        sootNewAffectedClasses = SootAnalysis.analysisOnMethods(cpString, testClass, testClassToMethod, this.selectedTests);
+                    } else {
+                        sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
+                    }
+
                     // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
                     // System.out.println("THE SIZE of sootNewAffectedClasses: " + sootNewAffectedClasses.size());
                     if (sootNewAffectedClasses.isEmpty() && removeBasedOnMethodsCall) {
@@ -274,13 +276,17 @@ public class IncDetectorPlugin extends DetectorPlugin {
                     // System.out.println("aATC: " + affectedClass + " SET: " + additionalAffectedTestClasses);
                     for (String additionalAffectedTestClass : additionalAffectedTestClasses) {
                         if(selectBasedOnMethodsCallUpgrade) {
-                            Set<String> reachableClassesFromAdditionalAffectedTestClass;
+                            Set<String> reachableClassesFromAdditionalAffectedTestClass = new HashSet<>();
                             if(SootAnalysisTestClassesToClassesSet.containsKey(additionalAffectedTestClass)) {
                                 reachableClassesFromAdditionalAffectedTestClass = SootAnalysisTestClassesToClassesSet.get(additionalAffectedTestClass);
                             }
                             else {
                                 // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
-                                reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
+                                if (fineGranularity) {
+                                    reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysisOnMethods(cpString, additionalAffectedTestClass, testClassToMethod, this.selectedTests);
+                                } else {
+                                    reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
+                                }
                                 // System.out.println("reachableClassesFromAdditionalAffectedTestClass: " + reachableClassesFromAdditionalAffectedTestClass);
                                 // remove the test class that could not reach any classes that contain static fields
                                 // System.out.println("THE SIZE of sootNewAffectedClasses: " + reachableClassesFromAdditionalAffectedTestClass.size());
@@ -391,6 +397,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         selectBasedOnMethodsCallUpgrade = Configuration.config().getProperty("dt.incdetector.selectonmethodsupgrade", false);
         removeBasedOnMethodsCall = Configuration.config().getProperty("dt.incdetector.removeonmethods", false);
         detectOrNot = Configuration.config().getProperty("dt.incdetector.detectornot", true);
+        fineGranularity = Configuration.config().getProperty("dt.incdetector.finegranularity", false);
 
         getSureFireClassPath(project);
         loader = createClassLoader(sureFireClassPath);
@@ -469,7 +476,13 @@ public class IncDetectorPlugin extends DetectorPlugin {
     protected List<String> getTests(
             final ProjectWrapper project,
             TestFramework testFramework) throws IOException {
-        List<String> tests = getOriginalOrder(project, testFramework, true);
+        System.out.println("SELECTED TESTS SIZE: " + this.selectedTests.size());
+        List<String> tests;
+        if (fineGranularity) {
+            tests = this.selectedTests;
+        } else {
+            tests = getOriginalOrder(project, testFramework, true);
+        }
         List<String> affectedTests = new ArrayList<>();
 
         String delimiter = testFramework.getDelimiter();
