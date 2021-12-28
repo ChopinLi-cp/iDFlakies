@@ -269,11 +269,21 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 }
             }
 
+            int classesCount = 0;
+            // for (String strKey: SootAnalysisTestClassesToClassesSet.keySet()) {
+            //     if (SootAnalysisTestClassesToClassesSet.get(strKey).isEmpty() == false) {
+            //         classesCount += 1;
+            //     }
+            // }
+            // record_classes_stats(classesCount);
+
             // Map<String, Set<String>> additionalAffectedTestClassesSet = new HashMap<>();
+            int filteredClassesCount = 0;
             for (String affectedClass : affectedClasses) {
                 if (reverseTransitiveClosure.containsKey(affectedClass)) {
                     Set<String> additionalAffectedTestClasses = reverseTransitiveClosure.get(affectedClass);
                     // System.out.println("aATC: " + affectedClass + " SET: " + additionalAffectedTestClasses);
+                    boolean additionalAffectedTestClassesFlag = false;
                     for (String additionalAffectedTestClass : additionalAffectedTestClasses) {
                         if(selectBasedOnMethodsCallUpgrade) {
                             Set<String> reachableClassesFromAdditionalAffectedTestClass = new HashSet<>();
@@ -300,6 +310,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                             if (reachableClassesFromAdditionalAffectedTestClass.contains(affectedClass)) {
                                 // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
                                 additionalTests.add(additionalAffectedTestClass);
+                                additionalAffectedTestClassesFlag = true;
                             }
                         }
                         else {
@@ -307,9 +318,23 @@ public class IncDetectorPlugin extends DetectorPlugin {
                             additionalTests.add(additionalAffectedTestClass);
                         }
                     }
+                    if (!additionalAffectedTestClassesFlag) {
+                        filteredClassesCount += 1;
+                    }
+                } else {
+                    classesCount += 1;
                 }
             }
             affectedTests.addAll(additionalTests);
+
+            record_classes_stats(classesCount);
+            record_classes_stats(filteredClassesCount);
+            // for (String strKey: SootAnalysisTestClassesToClassesSet.keySet()) {
+            //     if (SootAnalysisTestClassesToClassesSet.get(strKey).isEmpty() == false) {
+            //         filteredClassesCount += 1;
+            //     }
+            // }
+            // record_classes_stats(filteredClassesCount);
             return affectedTests;
         }
 

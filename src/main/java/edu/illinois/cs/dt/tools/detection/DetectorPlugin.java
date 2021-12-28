@@ -395,4 +395,22 @@ public class DetectorPlugin extends TestPlugin {
             e.printStackTrace();
         }
     }
+
+    public void record_classes_stats(int number) {
+        if(!Files.exists(DetectorPathManager.classesStatsPath())) {
+            try {
+                Files.createFile(DetectorPathManager.classesStatsPath());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        String stats = number + ",";
+        try {
+            Files.write(DetectorPathManager.timePath(), stats.getBytes(),
+                    StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
