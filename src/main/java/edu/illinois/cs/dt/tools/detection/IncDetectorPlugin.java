@@ -26,6 +26,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.logging.Level;
 
@@ -201,7 +202,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 return allTests;
             }
             else {
-                 // System.out.println("REMOVE OPTIONS0");
                 affectedTests = allTests;
             }
         }
@@ -225,7 +225,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
         if (selectBasedOnMethodsCall) {
             // this.affectedTestClasses = affectedTests;
             Map<String, List<String>> testClassToMethod = new HashMap<>();
-            List<SootMethod> entryPoints = new ArrayList<>();
             List<String> currentTests = super.getTests(project, this.runner.framework());
 
             // Using fine granularity (methods level)
@@ -250,18 +249,16 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 // System.out.println("CONTAIN OR NOT" + affectedTests.contains(testClass));
                 if(affectedTests.contains(testClass)) {
                     Set<String> sootNewAffectedClasses = new HashSet<>();
-                    if (fineGranularity) {
-                        sootNewAffectedClasses = SootAnalysis.analysisOnMethods(cpString, testClass, testClassToMethod, this.selectedTests);
-                    } else {
-                        sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod);
-                    }
+                    // Combine these two methods to one method ...
+                    // analysis(String cpString, String testClass, Map<> testClassToMethod) {
+                    //    return analysisOnMethods(cpString, testClass, testClassToMethod, new ArrayList<>());
+                    sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod, fineGranularity, this.selectedTests);
 
                     // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
                     // System.out.println("THE SIZE of sootNewAffectedClasses: " + sootNewAffectedClasses.size());
                     if (sootNewAffectedClasses.isEmpty() && removeBasedOnMethodsCall) {
                         // System.out.println("REMOVE OPTIONS1");
                         affectedTests.remove(testClass);
-                        affectedClasses.remove(testClass);
                     } else {
                         affectedClasses.addAll(sootNewAffectedClasses);
                         SootAnalysisTestClassesToClassesSet.put(testClass, sootNewAffectedClasses);
@@ -269,14 +266,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 }
             }
 
-            int classesCount = 0;
-            // for (String strKey: SootAnalysisTestClassesToClassesSet.keySet()) {
-            //     if (SootAnalysisTestClassesToClassesSet.get(strKey).isEmpty() == false) {
-            //         classesCount += 1;
-            //     }
-            // }
-            // record_classes_stats(classesCount);
-
+            record_classes_stats(affectedClasses.size());
             // Map<String, Set<String>> additionalAffectedTestClassesSet = new HashMap<>();
             int filteredClassesCount = 0;
             for (String affectedClass : affectedClasses) {
@@ -292,11 +282,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                             }
                             else {
                                 // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
-                                if (fineGranularity) {
-                                    reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysisOnMethods(cpString, additionalAffectedTestClass, testClassToMethod, this.selectedTests);
-                                } else {
-                                    reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod);
-                                }
+                                reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod, fineGranularity, this.selectedTests);
                                 // System.out.println("reachableClassesFromAdditionalAffectedTestClass: " + reachableClassesFromAdditionalAffectedTestClass);
                                 // remove the test class that could not reach any classes that contain static fields
                                 // System.out.println("THE SIZE of sootNewAffectedClasses: " + reachableClassesFromAdditionalAffectedTestClass.size());
@@ -322,26 +308,30 @@ public class IncDetectorPlugin extends DetectorPlugin {
                         filteredClassesCount += 1;
                     }
                 } else {
-                    classesCount += 1;
+                    filteredClassesCount += 1;
                 }
             }
             affectedTests.addAll(additionalTests);
 
-            record_classes_stats(classesCount);
             record_classes_stats(filteredClassesCount);
-            // for (String strKey: SootAnalysisTestClassesToClassesSet.keySet()) {
-            //     if (SootAnalysisTestClassesToClassesSet.get(strKey).isEmpty() == false) {
-            //         filteredClassesCount += 1;
-            //     }
-            // }
-            // record_classes_stats(filteredClassesCount);
+
+            record_classes_deps(SootAnalysisTestClassesToClassesSet);
             return affectedTests;
         }
 
+        // add class count for basic version ...
+        int classCount = 0;
+        Map<String, Set<String>> normalTestClassToClassesSet = new HashMap<>();
+        Map<String, Boolean> classContainsStaticFieldsOrNot = new HashMap<>();
         for (String affectedTest : affectedTests) {
             Set<String> dependencies = transitiveClosure.get(affectedTest);
             for (String dependency : dependencies) {
                 if (processedClasses.contains(dependency)) {
+                    if (classContainsStaticFieldsOrNot.get(dependency)) {
+                        Set<String> valuesString = normalTestClassToClassesSet.get(affectedTest);
+                        valuesString.add(dependency);
+                        normalTestClassToClassesSet.replace(affectedTest, valuesString);
+                    }
                     continue;
                 }
                 processedClasses.add(dependency);
@@ -354,6 +344,11 @@ public class IncDetectorPlugin extends DetectorPlugin {
                             if (upperLevelAffectedTestClasses != null) {
                                 additionalTests.addAll(upperLevelAffectedTestClasses);
                             }
+                            Set<String> valuesString = normalTestClassToClassesSet.get(affectedTest);
+                            valuesString.add(dependency);
+                            normalTestClassToClassesSet.replace(affectedTest, valuesString);
+                            classContainsStaticFieldsOrNot.put(dependency, true);
+                            classCount += 1;
                             break;
                         }
                     }
@@ -366,6 +361,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
 
+        record_classes_stats(classCount);
+        record_classes_deps(normalTestClassToClassesSet);
         affectedTests.addAll(additionalTests);
 
         return affectedTests;
@@ -688,4 +685,26 @@ public class IncDetectorPlugin extends DetectorPlugin {
         return loadables;
     }
 
+    public void record_classes_deps(Map<String, Set<String>> testClassToClassesMap) {
+        if(!Files.exists(DetectorPathManager.classesDepsPath())) {
+            try {
+                Files.createFile(DetectorPathManager.classesDepsPath());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        for(String testClass: testClassToClassesMap.keySet()) {
+            String deps = testClass + ": ";
+            for (String dep: testClassToClassesMap.get(testClass)) {
+                deps += dep + ";";
+            }
+            try {
+                Files.write(DetectorPathManager.classesDepsPath(), deps.getBytes(),
+                        StandardOpenOption.APPEND);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }

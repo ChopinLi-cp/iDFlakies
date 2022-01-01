@@ -407,7 +407,7 @@ public class DetectorPlugin extends TestPlugin {
 
         String stats = number + ",";
         try {
-            Files.write(DetectorPathManager.timePath(), stats.getBytes(),
+            Files.write(DetectorPathManager.classesStatsPath(), stats.getBytes(),
                     StandardOpenOption.APPEND);
         } catch (IOException e) {
             e.printStackTrace();

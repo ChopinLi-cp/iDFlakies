@@ -1,6 +1,7 @@
 package edu.illinois.cs.dt.tools.utility;
 
 import soot.*;
+import soot.Hierarchy;
 import soot.jimple.*;
 import soot.jimple.toolkits.callgraph.CallGraph;
 import soot.jimple.toolkits.callgraph.Edge;
@@ -23,7 +24,6 @@ public class SootAnalysis {
     private static String sourceDirectory;
     private static String clzName;
     private static String methodName;
-    private static List<SootMethod> entryPoints = new ArrayList();
     private static LinkedList<String> excludeList;
 
 
@@ -83,7 +83,6 @@ public class SootAnalysis {
         // Options.v().set_process_dir(Collections.singletonList(sourceDirectory));
         Options.v().set_whole_program(true);
         // Options.v().set_allow_phantom_refs(true); // especially for wildfly
-        entryPoints.clear();
 
     }
 
@@ -130,98 +129,6 @@ public class SootAnalysis {
             }
         }
         return hasAnnotation;
-    }
-
-    public static Set<String> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod) {
-        Set<String> affectedClasses = new HashSet<>();
-
-        sourceDirectory = srcDir;
-        clzName = clsName;
-
-        setupSoot();
-        SootClass sc = Scene.v().forceResolve(clzName, BODIES);// Scene.v().loadClassAndSupport(clsName);
-        sc.setApplicationClass();
-        Scene.v().loadNecessaryClasses();
-
-        putEntryPoints(sc, entryPoints);
-
-        // Add the tests
-        for (String test : testClassToMethod.get(clzName)) {
-            String testName = test.substring(test.lastIndexOf(".") + 1);
-            try {
-                entryPoints.add(sc.getMethodByName(testName));
-            } catch (Exception e) {
-                e.printStackTrace();
-                if (sc.hasSuperclass()) {
-                    // System.out.println("sc.hasSuperclass()");
-                    SootClass upperSootClass = sc.getSuperclass();
-                    try {
-                        entryPoints.add(upperSootClass.getMethodByName(testName));
-                        if(!Scene.v().containsClass(upperSootClass.getName())) {
-                            Scene.v().addClass(upperSootClass);
-                            Scene.v().forceResolve(upperSootClass.getName(), BODIES);
-                            upperSootClass.setApplicationClass();
-                            putEntryPoints(upperSootClass, entryPoints);
-                        }
-                    } catch (Exception methodNotFoundException) {
-                        methodNotFoundException.printStackTrace();
-                    }
-                }
-            }
-        }
-        Scene.v().setEntryPoints(entryPoints);
-        PackManager.v().runPacks();
-
-        int c = 1;
-
-        // Call graph
-        CallGraph callGraph = Scene.v().getCallGraph();
-        ReachableMethods rm = new ReachableMethods(callGraph, entryPoints);
-        rm.update();
-        QueueReader qr = rm.listener();
-
-        // System.out.println("-------------------");
-        // System.out.println("-----Reachable Methods-----");
-
-        // qr = rm.listener();
-        for(Iterator<SootMethod> it = qr; it.hasNext(); ) {
-            try {
-                SootMethod reachableMethod = it.next();
-                if (SootUtil.inLibrary(reachableMethod.getDeclaringClass().getName()) || inExcludeList(reachableMethod.getDeclaringClass().getName())) {
-                    continue;
-                }
-                if(reachableMethod.isPhantom()) {
-                    continue;
-                }
-                JimpleBody reachableMethodBody = (JimpleBody) reachableMethod.retrieveActiveBody();
-                c = 0;
-                for (Unit u : reachableMethodBody.getUnits()) {
-                    c++;
-                    Stmt stmt = (Stmt) u;
-                    if (stmt.containsFieldRef())
-                        reportFieldRefInfo(stmt, affectedClasses);
-                }
-            } catch (Exception e) {
-                // System.out.println("LIKELY ERROR: cannot get resident body for phantom method");
-                e.printStackTrace();
-            }
-        }
-
-        // System.out.println("-------------------");
-        // System.out.println("All the classes that could be accessed through accessing corresponding static fields. (" + clsName + ");");
-        // for(String item: affectedClasses) {
-        //     System.out.print(item + ";");
-        // }
-        // System.out.println("");
-
-//        for (SootField sf: sc.getFields()){
-//            // System.out.println(sf.getSignature());
-//            if (sf.isStatic()) {
-//                affectedClasses.add(clzName);
-//                break;
-//            }
-//        }
-        return affectedClasses;
     }
 
     public static boolean detectAffectedClasses(CallGraph callGraph, List<SootMethod> tmpEntryPoints, Set<String> affectedClasses) {
@@ -292,9 +199,10 @@ public class SootAnalysis {
         }
     }
 
-    public static Set<String> analysisOnMethods(String srcDir, String clsName, Map<String, List<String>> testClassToMethod, List<String> selectedTests) {
+    public static Set<String> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod, boolean fineGranularity, List<String> selectedTests) {
         Set<String> affectedClasses = new HashSet<>();
 
+        List<SootMethod> entryPoints = new ArrayList();
         List<SootMethod> tmpEntryPoints = new ArrayList();
 
         sourceDirectory = srcDir;
@@ -308,27 +216,36 @@ public class SootAnalysis {
         putEntryPoints(sc, entryPoints);
         putEntryPoints(sc, tmpEntryPoints);
 
+        Map<String, SootMethod> testNameToSootMethod = new HashMap<>();
         // Add the tests
         for (String test : testClassToMethod.get(clzName)) {
             String testName = test.substring(test.lastIndexOf(".") + 1);
             try {
-                entryPoints.add(sc.getMethodByName(testName));
+                SootMethod sm = sc.getMethodByName(testName);
+                entryPoints.add(sm);
+                testNameToSootMethod.put(test, sm);
             } catch (Exception e) {
                 // e.printStackTrace();
                 if (sc.hasSuperclass()) {
-                    // System.out.println("sc.hasSuperclass()");
-                    SootClass upperSootClass = sc.getSuperclass();
-                    try {
-                        entryPoints.add(upperSootClass.getMethodByName(testName));
-                        if(!Scene.v().containsClass(upperSootClass.getName())) {
-                            Scene.v().addClass(upperSootClass);
-                            Scene.v().forceResolve(upperSootClass.getName(), BODIES);
-                            upperSootClass.setApplicationClass();
-                            putEntryPoints(upperSootClass, entryPoints);
-                            putEntryPoints(upperSootClass, tmpEntryPoints);
+                    Hierarchy hierarchy = Scene.v().getActiveHierarchy();
+                    for (SootClass upperSootClass: hierarchy.getSuperclassesOf(sc)) {
+                        // System.out.println("sc.hasSuperclass()");
+                        // SootClass upperSootClass = sc.getSuperclass();
+                        try {
+                            SootMethod sm = upperSootClass.getMethodByName(testName);
+                            entryPoints.add(sm);
+                            testNameToSootMethod.put(test, sm);
+                            // Do a loop on super classes ...
+                            if (!Scene.v().containsClass(upperSootClass.getName())) {
+                                Scene.v().addClass(upperSootClass);
+                                Scene.v().forceResolve(upperSootClass.getName(), BODIES);
+                                upperSootClass.setApplicationClass();
+                                putEntryPoints(upperSootClass, entryPoints);
+                                putEntryPoints(upperSootClass, tmpEntryPoints);
+                            }
+                        } catch (Exception methodNotFoundException) {
+                            methodNotFoundException.printStackTrace();
                         }
-                    } catch (Exception methodNotFoundException) {
-                        methodNotFoundException.printStackTrace();
                     }
                 }
             }
@@ -338,31 +255,24 @@ public class SootAnalysis {
 
         // Call graph
         CallGraph callGraph = Scene.v().getCallGraph();
+        if (!fineGranularity) {
+            detectAffectedClasses(callGraph, entryPoints, affectedClasses);
+            return affectedClasses;
+        }
         detectAffectedClasses(callGraph, tmpEntryPoints, affectedClasses);
 
         if (!affectedClasses.isEmpty()) {
             selectedTests.addAll(testClassToMethod.get(clzName));
-            return affectedClasses;
+            return affectedClasses; // affectedClasses also contain the classes reachable from the test methods
         }
         else {
             for (String test : testClassToMethod.get(clzName)) {
                 tmpEntryPoints.clear();
-                String testName = test.substring(test.lastIndexOf(".") + 1);
-                // System.out.println("CLASSTOTEST: " + clzName + "; " + test );
+                // remove the tmpEntryPoints from entryPoints to get the Soot Method ...
                 try {
-                    SootMethod sm = sc.getMethodByName(testName);
-                    tmpEntryPoints.add(sm);
+                    tmpEntryPoints.add(testNameToSootMethod.get(test));
                 } catch (Exception e) {
                     // e.printStackTrace();
-                    if (sc.hasSuperclass()) {
-                        // System.out.println("sc.hasSuperclass()");
-                        SootClass upperSootClass = sc.getSuperclass();
-                        try {
-                            tmpEntryPoints.add(upperSootClass.getMethodByName(testName));
-                        } catch (Exception methodNotFoundException) {
-                            methodNotFoundException.printStackTrace();
-                        }
-                    }
                 }
                 boolean reachStaticFields = detectAffectedClasses(callGraph, tmpEntryPoints, affectedClasses);
                 // tmpEntryPoints.remove(sm);
