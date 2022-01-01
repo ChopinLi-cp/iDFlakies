@@ -302,6 +302,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                         else {
                             // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
                             additionalTests.add(additionalAffectedTestClass);
+                            additionalAffectedTestClassesFlag = true;
                         }
                     }
                     if (!additionalAffectedTestClassesFlag) {
@@ -327,10 +328,15 @@ public class IncDetectorPlugin extends DetectorPlugin {
             Set<String> dependencies = transitiveClosure.get(affectedTest);
             for (String dependency : dependencies) {
                 if (processedClasses.contains(dependency)) {
-                    if (classContainsStaticFieldsOrNot.get(dependency)) {
-                        Set<String> valuesString = normalTestClassToClassesSet.get(affectedTest);
-                        valuesString.add(dependency);
-                        normalTestClassToClassesSet.replace(affectedTest, valuesString);
+                    if (classContainsStaticFieldsOrNot.containsKey(dependency)) {
+                        if (classContainsStaticFieldsOrNot.get(dependency)) {
+                            Set<String> valuesString = new HashSet<>();
+                            if (normalTestClassToClassesSet.containsKey(affectedTest)) {
+                                valuesString = normalTestClassToClassesSet.get(affectedTest);
+                            }
+                            valuesString.add(dependency);
+                            normalTestClassToClassesSet.put(affectedTest, valuesString);
+                        }
                     }
                     continue;
                 }
@@ -344,9 +350,12 @@ public class IncDetectorPlugin extends DetectorPlugin {
                             if (upperLevelAffectedTestClasses != null) {
                                 additionalTests.addAll(upperLevelAffectedTestClasses);
                             }
-                            Set<String> valuesString = normalTestClassToClassesSet.get(affectedTest);
+                            Set<String> valuesString = new HashSet<>();
+                            if (normalTestClassToClassesSet.containsKey(affectedTest)) {
+                                valuesString = normalTestClassToClassesSet.get(affectedTest);
+                            }
                             valuesString.add(dependency);
-                            normalTestClassToClassesSet.replace(affectedTest, valuesString);
+                            normalTestClassToClassesSet.put(affectedTest, valuesString);
                             classContainsStaticFieldsOrNot.put(dependency, true);
                             classCount += 1;
                             break;
@@ -699,6 +708,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             for (String dep: testClassToClassesMap.get(testClass)) {
                 deps += dep + ";";
             }
+            deps += "\n";
             try {
                 Files.write(DetectorPathManager.classesDepsPath(), deps.getBytes(),
                         StandardOpenOption.APPEND);

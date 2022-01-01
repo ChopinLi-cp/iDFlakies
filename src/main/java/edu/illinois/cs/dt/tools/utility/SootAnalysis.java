@@ -243,6 +243,7 @@ public class SootAnalysis {
                                 putEntryPoints(upperSootClass, entryPoints);
                                 putEntryPoints(upperSootClass, tmpEntryPoints);
                             }
+                            break;
                         } catch (Exception methodNotFoundException) {
                             methodNotFoundException.printStackTrace();
                         }
