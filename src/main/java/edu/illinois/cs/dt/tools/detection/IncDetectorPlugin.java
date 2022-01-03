@@ -240,6 +240,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
 
             Map<String, Set<String>> SootAnalysisTestClassesToClassesSet = new HashMap<>();
+            Map<String, Set<String>> SootAnalysisFieldsToAffectedClassesSet = new HashMap<>();
             for (String testClass : testClassToMethod.keySet()) {
                 // System.out.println("GOING TO RUN SOOT ANALYSIS FOR TC: " + testClass);
                 // long startTime = System.currentTimeMillis();
@@ -249,10 +250,27 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 // System.out.println("CONTAIN OR NOT" + affectedTests.contains(testClass));
                 if(affectedTests.contains(testClass)) {
                     Set<String> sootNewAffectedClasses = new HashSet<>();
+                    Map<String, Set<String>> sootNewAffectedClassesToFields = new HashMap<>();
                     // Combine these two methods to one method ...
                     // analysis(String cpString, String testClass, Map<> testClassToMethod) {
                     //    return analysisOnMethods(cpString, testClass, testClassToMethod, new ArrayList<>());
-                    sootNewAffectedClasses = SootAnalysis.analysis(cpString, testClass, testClassToMethod, fineGranularity, this.selectedTests);
+                    sootNewAffectedClassesToFields = SootAnalysis.analysis(cpString, testClass, testClassToMethod, fineGranularity, this.selectedTests);
+                    sootNewAffectedClasses = sootNewAffectedClassesToFields.keySet();
+
+                    for (String sootNewAffectedClass: sootNewAffectedClasses) {
+                        Set<String> fieldValues = sootNewAffectedClassesToFields.get(sootNewAffectedClass);
+                        for (String fieldValue : fieldValues) {
+                            String key = sootNewAffectedClass + "." + fieldValue;
+                            Set<String> values = new HashSet<>();
+                            if (SootAnalysisFieldsToAffectedClassesSet.containsKey(key)) {
+                                values = SootAnalysisFieldsToAffectedClassesSet.get(key);
+                                values.add(testClass);
+                            } else {
+                                values.add(testClass);
+                            }
+                            SootAnalysisFieldsToAffectedClassesSet.put(key, values);
+                        }
+                    }
 
                     // System.out.println("END TIME: " + (System.currentTimeMillis() - startTime));
                     // System.out.println("THE SIZE of sootNewAffectedClasses: " + sootNewAffectedClasses.size());
@@ -277,12 +295,30 @@ public class IncDetectorPlugin extends DetectorPlugin {
                     for (String additionalAffectedTestClass : additionalAffectedTestClasses) {
                         if(selectBasedOnMethodsCallUpgrade) {
                             Set<String> reachableClassesFromAdditionalAffectedTestClass = new HashSet<>();
+                            Map<String, Set<String>> reachableClassesFromAdditionalAffectedTestClassToFields = new HashMap<>();
                             if(SootAnalysisTestClassesToClassesSet.containsKey(additionalAffectedTestClass)) {
                                 reachableClassesFromAdditionalAffectedTestClass = SootAnalysisTestClassesToClassesSet.get(additionalAffectedTestClass);
                             }
                             else {
                                 // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
-                                reachableClassesFromAdditionalAffectedTestClass = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod, fineGranularity, this.selectedTests);
+                                reachableClassesFromAdditionalAffectedTestClassToFields = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod, fineGranularity, this.selectedTests);
+                                reachableClassesFromAdditionalAffectedTestClass = reachableClassesFromAdditionalAffectedTestClassToFields.keySet();
+
+                                for (String reachableClassFromAdditionalAffectedTestClass: reachableClassesFromAdditionalAffectedTestClass) {
+                                    Set<String> fieldValues = reachableClassesFromAdditionalAffectedTestClassToFields.get(reachableClassFromAdditionalAffectedTestClass);
+                                    for (String fieldValue : fieldValues) {
+                                        String key = reachableClassFromAdditionalAffectedTestClass + "." + fieldValue;
+                                        Set<String> values = new HashSet<>();
+                                        if (SootAnalysisFieldsToAffectedClassesSet.containsKey(key)) {
+                                            values = SootAnalysisFieldsToAffectedClassesSet.get(key);
+                                            values.add(additionalAffectedTestClass);
+                                        } else {
+                                            values.add(additionalAffectedTestClass);
+                                        }
+                                        SootAnalysisFieldsToAffectedClassesSet.put(key, values);
+                                    }
+                                }
+
                                 // System.out.println("reachableClassesFromAdditionalAffectedTestClass: " + reachableClassesFromAdditionalAffectedTestClass);
                                 // remove the test class that could not reach any classes that contain static fields
                                 // System.out.println("THE SIZE of sootNewAffectedClasses: " + reachableClassesFromAdditionalAffectedTestClass.size());
@@ -316,7 +352,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
             record_classes_stats(filteredClassesCount);
 
-            record_classes_deps(SootAnalysisTestClassesToClassesSet);
+            record_classes_deps(SootAnalysisFieldsToAffectedClassesSet);
             return affectedTests;
         }
 

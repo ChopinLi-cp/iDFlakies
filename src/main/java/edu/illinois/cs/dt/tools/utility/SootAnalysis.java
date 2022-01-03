@@ -86,7 +86,7 @@ public class SootAnalysis {
 
     }
 
-    private static boolean reportFieldRefInfo(Stmt stmt, final Set<String> affectedClasses) {
+    private static boolean reportFieldRefInfo(Stmt stmt, final Map<String, Set<String>> affectedClassesToFields) {
         final boolean[] reachStaticFields = {false};
         FieldRef fieldRef = stmt.getFieldRef();
         // System.out.println("FIELDREF: " + fieldRef);
@@ -98,7 +98,16 @@ public class SootAnalysis {
                 if (SootUtil.inLibrary(v.getFieldRef().declaringClass().getName()) || inExcludeList(v.getFieldRef().declaringClass().getName())) {
                     return;
                 }
-                affectedClasses.add(v.getFieldRef().declaringClass().getName());
+                String className = v.getFieldRef().declaringClass().getName();
+                String fieldName = v.getField().getName();
+                Set<String> fieldNames = new HashSet<>();
+                if (!affectedClassesToFields.containsKey(className)) {
+                    fieldNames.add(fieldName);
+                } else {
+                    fieldNames = affectedClassesToFields.get(className);
+                    fieldNames.add(fieldName);
+                }
+                affectedClassesToFields.put(className, fieldNames);
                 reachStaticFields[0] = true;
                 // affectedClasses.add(v.getField().getName());
             }
@@ -131,7 +140,7 @@ public class SootAnalysis {
         return hasAnnotation;
     }
 
-    public static boolean detectAffectedClasses(CallGraph callGraph, List<SootMethod> tmpEntryPoints, Set<String> affectedClasses) {
+    public static boolean detectAffectedClasses(CallGraph callGraph, List<SootMethod> tmpEntryPoints, Map<String, Set<String>> affectedClassesToFields) {
         boolean flag = false;
 
         ReachableMethods rm = new ReachableMethods(callGraph, tmpEntryPoints);
@@ -156,7 +165,7 @@ public class SootAnalysis {
                 for (Unit u : reachableMethodBody.getUnits()) {
                     Stmt stmt = (Stmt) u;
                     if (stmt.containsFieldRef()) {
-                        boolean reachStaticFields = reportFieldRefInfo(stmt, affectedClasses);
+                        boolean reachStaticFields = reportFieldRefInfo(stmt, affectedClassesToFields);
                         if (reachStaticFields) {
                             flag = true;
                         }
@@ -199,8 +208,9 @@ public class SootAnalysis {
         }
     }
 
-    public static Set<String> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod, boolean fineGranularity, List<String> selectedTests) {
-        Set<String> affectedClasses = new HashSet<>();
+    public static Map<String, Set<String>> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod, boolean fineGranularity, List<String> selectedTests) {
+        // Set<String> affectedClasses = new HashSet<>();
+        Map<String, Set<String>> affectedClassesToFields = new HashMap<>();
 
         List<SootMethod> entryPoints = new ArrayList();
         List<SootMethod> tmpEntryPoints = new ArrayList();
@@ -257,14 +267,14 @@ public class SootAnalysis {
         // Call graph
         CallGraph callGraph = Scene.v().getCallGraph();
         if (!fineGranularity) {
-            detectAffectedClasses(callGraph, entryPoints, affectedClasses);
-            return affectedClasses;
+            detectAffectedClasses(callGraph, entryPoints, affectedClassesToFields);
+            return affectedClassesToFields;
         }
-        detectAffectedClasses(callGraph, tmpEntryPoints, affectedClasses);
+        detectAffectedClasses(callGraph, tmpEntryPoints, affectedClassesToFields);
 
-        if (!affectedClasses.isEmpty()) {
+        if (!affectedClassesToFields.keySet().isEmpty()) {
             selectedTests.addAll(testClassToMethod.get(clzName));
-            return affectedClasses; // affectedClasses also contain the classes reachable from the test methods
+            return affectedClassesToFields; // affectedClasses also contain the classes reachable from the test methods
         }
         else {
             for (String test : testClassToMethod.get(clzName)) {
@@ -275,7 +285,7 @@ public class SootAnalysis {
                 } catch (Exception e) {
                     // e.printStackTrace();
                 }
-                boolean reachStaticFields = detectAffectedClasses(callGraph, tmpEntryPoints, affectedClasses);
+                boolean reachStaticFields = detectAffectedClasses(callGraph, tmpEntryPoints, affectedClassesToFields);
                 // tmpEntryPoints.remove(sm);
                 if (reachStaticFields) {
                     // System.out.println("CLASSTOTEST2: " + clzName + "; " + test );
@@ -284,7 +294,7 @@ public class SootAnalysis {
             }
         }
 
-        return affectedClasses;
+        return affectedClassesToFields;
     }
 
 }
