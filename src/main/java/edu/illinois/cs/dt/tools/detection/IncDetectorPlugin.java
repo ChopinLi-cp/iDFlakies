@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.logging.Level;
+import java.util.stream.Collectors;
 
 import static edu.illinois.starts.constants.StartsConstants.*;
 
@@ -745,12 +746,16 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
 
-        for(String testClass: testClassToClassesMap.keySet()) {
-            String deps = testClass + ": ";
-            for (String dep: testClassToClassesMap.get(testClass)) {
+        List<Map.Entry<String, Set<String>>> list = testClassToClassesMap.entrySet().stream()
+                .sorted((entry1, entry2) -> ((Integer) entry2.getValue().size()).compareTo((Integer) entry1.getValue().size()))
+                .collect(Collectors.toList());
+
+        for(Map.Entry<String, Set<String>> entry: list) {
+            String deps = entry.getKey() + ": ";
+            for (String dep: entry.getValue()) {
                 deps += dep + ";";
             }
-            deps += "\n";
+            deps += " " + entry.getValue().size() + "\n";
             try {
                 Files.write(DetectorPathManager.classesDepsPath(), deps.getBytes(),
                         StandardOpenOption.APPEND);
