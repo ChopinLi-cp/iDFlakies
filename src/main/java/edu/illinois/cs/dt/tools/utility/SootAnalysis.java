@@ -1,5 +1,6 @@
 package edu.illinois.cs.dt.tools.utility;
 
+import edu.illinois.cs.dt.tools.detection.IncDetectorPlugin;
 import soot.*;
 import soot.Hierarchy;
 import soot.jimple.*;
@@ -14,6 +15,8 @@ import soot.tagkit.VisibilityAnnotationTag;
 import soot.util.queue.QueueReader;
 
 import java.io.File;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -25,6 +28,7 @@ public class SootAnalysis {
     private static String clzName;
     private static String methodName;
     private static LinkedList<String> excludeList;
+    private static Set<String> immutableList;
 
 
     private static LinkedList<String> getExcludeList() {
@@ -61,6 +65,63 @@ public class SootAnalysis {
         return false;
     }
 
+    private static Set<String> getImmutableList() {
+        if (immutableList == null) {
+            immutableList = new HashSet<>();
+
+            immutableList.add("java.lang.String");
+            immutableList.add("java.lang.Integer");
+            immutableList.add("java.lang.Byte");
+            immutableList.add("java.lang.Character");
+            immutableList.add("java.lang.Short");
+            immutableList.add("java.lang.Boolean");
+            immutableList.add("java.lang.Long");
+            immutableList.add("java.lang.Double");
+            immutableList.add("java.lang.Float");
+            immutableList.add("java.lang.StackTraceElement");
+            immutableList.add("java.lang.String");
+            immutableList.add("java.lang.Enum");
+            immutableList.add("java.math.BigInteger");
+            immutableList.add("java.math.BigDecimal");
+            immutableList.add("java.io.File");
+            immutableList.add("java.awt.Font");
+            immutableList.add("java.awt.BasicStroke");
+            immutableList.add("java.awt.Color");
+            immutableList.add("java.awt.GradientPaint");
+            immutableList.add("java.awt.LinearGradientPaint");
+            immutableList.add("java.awt.RadialGradientPaint");
+            immutableList.add("java.awt.Cursor");
+            immutableList.add("java.util.Locale");
+            immutableList.add("java.util.UUID");
+            immutableList.add("java.util.Collections");
+            immutableList.add("java.net.URL");
+            immutableList.add("java.net.URI");
+            immutableList.add("java.net.Inet4Address");
+            immutableList.add("java.net.Inet6Address");
+            immutableList.add("java.net.InetSocketAddress");
+            immutableList.add("java.awt.BasicStroke");
+            immutableList.add("java.awt.Color");
+            immutableList.add("java.awt.GradientPaint");
+            immutableList.add("java.awt.LinearGradientPaint");
+            immutableList.add("java.awt.RadialGradientPaint");
+            immutableList.add("java.awt.Cursor");
+            immutableList.add("java.util.regex.Pattern");
+        }
+        return immutableList;
+    }
+
+    private static boolean inImmutableList(String typeName, boolean isFinal) {
+
+        // System.out.println("TYPENAME: " + typeName);
+        for (String immutableTypeName: immutableList) {
+            if ((typeName.equals(immutableTypeName)) && isFinal) {
+                // System.out.println("TYPENAME: " + typeName);
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static void excludeJDKLibrary() {
         // exclude jdk classes
         Options.v().set_exclude(getExcludeList());
@@ -74,6 +135,7 @@ public class SootAnalysis {
 
         // System.out.println("EXCLUDE: " + Options.v().exclude());
         excludeJDKLibrary();
+        getImmutableList();
         // System.out.println("EXCLUDE: " + Options.v().exclude());
 
         Options.v().set_prepend_classpath(true);
@@ -95,11 +157,28 @@ public class SootAnalysis {
             public void caseStaticFieldRef(StaticFieldRef v) {
                 // A static field reference
                 // System.out.println("A static field reference: " + v.getFieldRef() + " " + v.getFieldRef().isStatic());
-                if (SootUtil.inLibrary(v.getFieldRef().declaringClass().getName()) || inExcludeList(v.getFieldRef().declaringClass().getName())) {
-                    return;
-                }
                 String className = v.getFieldRef().declaringClass().getName();
                 String fieldName = v.getField().getName();
+                String typeName = v.getType().toString();
+                if (SootUtil.inLibrary(className) || inExcludeList(className) || v.getFieldRef().declaringClass().isJavaLibraryClass()) {
+                    return;
+                }
+
+                boolean isFinal = false;
+                if (Modifier.isFinal(v.getField().getModifiers())) {
+                    isFinal = true;
+                }
+                if (inImmutableList(typeName, isFinal)) {
+                    return;
+                }
+                if ( v.getField().getDeclaringClass().isEnum()) {
+                    return;
+                }
+//                if ((v.getField().getModifiers() & 0x00004000) != 0) {
+//                    return;
+//                }
+
+
                 Set<String> fieldNames = new HashSet<>();
                 if (!affectedClassesToFields.containsKey(className)) {
                     fieldNames.add(fieldName);

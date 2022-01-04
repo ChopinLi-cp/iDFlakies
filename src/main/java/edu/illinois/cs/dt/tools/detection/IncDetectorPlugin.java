@@ -129,6 +129,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     protected List<String> selectedTests;
 
+    private static Set<String> immutableList;
+
     @Override
     public void execute(final ProjectWrapper project) {
         final ErrorLogger logger = new ErrorLogger(project);
@@ -357,6 +359,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         }
 
         // add class count for basic version ...
+        getImmutableList();
         int classCount = 0;
         Map<String, Set<String>> normalTestClassToClassesSet = new HashMap<>();
         Map<String, Boolean> classContainsStaticFieldsOrNot = new HashMap<>();
@@ -380,6 +383,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 try {
                     Class clazz = loader.loadClass(dependency);
                     for (Field field : clazz.getDeclaredFields()) {
+                        if (inImmutableList(field)) {
+                            continue;
+                        }
                         if (Modifier.isStatic(field.getModifiers())) {
                             String upperLevelAffectedClass = clazz.getName();
                             Set<String> upperLevelAffectedTestClasses = reverseTransitiveClosure.get(upperLevelAffectedClass);
@@ -752,5 +758,61 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 e.printStackTrace();
             }
         }
+    }
+
+    private static Set<String> getImmutableList() {
+        if (immutableList == null) {
+            immutableList = new HashSet<>();
+
+            immutableList.add("java.lang.String");
+            immutableList.add("java.lang.Enum");
+            immutableList.add("java.lang.StackTraceElement");
+            immutableList.add("java.math.BigInteger");
+            immutableList.add("java.math.BigDecimal");
+            immutableList.add("java.io.File");
+            immutableList.add("java.awt.Font");
+            immutableList.add("java.awt.BasicStroke");
+            immutableList.add("java.awt.Color");
+            immutableList.add("java.awt.GradientPaint");
+            immutableList.add("java.awt.LinearGradientPaint");
+            immutableList.add("java.awt.RadialGradientPaint");
+            immutableList.add("java.awt.Cursor");
+            immutableList.add("java.util.Locale");
+            immutableList.add("java.util.UUID");
+            immutableList.add("java.util.Collections");
+            immutableList.add("java.net.URL");
+            immutableList.add("java.net.URI");
+            immutableList.add("java.net.Inet4Address");
+            immutableList.add("java.net.Inet6Address");
+            immutableList.add("java.net.InetSocketAddress");
+            immutableList.add("java.awt.BasicStroke");
+            immutableList.add("java.awt.Color");
+            immutableList.add("java.awt.GradientPaint");
+            immutableList.add("java.awt.LinearGradientPaint");
+            immutableList.add("java.awt.RadialGradientPaint");
+            immutableList.add("java.awt.Cursor");
+            immutableList.add("java.util.regex.Pattern");
+        }
+        return immutableList;
+    }
+
+    private static boolean inImmutableList(Field field) {
+        boolean isFinal = false;
+        if (Modifier.isFinal(field.getModifiers())) {
+            isFinal = true;
+        }
+
+        if ((field.getType().isPrimitive() || field.getDeclaringClass().isEnum()) && isFinal) {
+            // System.out.println("FIELDNAME(P|E): " + field.getType().getName());
+            return true;
+        }
+
+        for (String immutableTypeName: immutableList) {
+            if ((field.getType().getName().equals(immutableTypeName)) && isFinal) {
+                // System.out.println("FIELDNAME: " + field.getType().getName());
+                return true;
+            }
+        }
+        return false;
     }
 }
