@@ -56,6 +56,7 @@ public class SootAnalysis {
             excludeList.add("org.xml.*");
             excludeList.add("org.codehaus.*");
             excludeList.add("org.junit.*");
+            excludeList.add("javassist.*");
         }
         return excludeList;
     }
