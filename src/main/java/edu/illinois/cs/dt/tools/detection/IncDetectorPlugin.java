@@ -13,6 +13,7 @@ import edu.illinois.starts.maven.AgentLoader;
 import edu.illinois.starts.util.Logger;
 import edu.illinois.starts.util.Pair;
 import edu.illinois.yasgl.DirectedGraph;
+import edu.illinois.yasgl.GraphUtils;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.surefire.booter.Classpath;
@@ -216,7 +217,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
         Map<String, Set<String>> transitiveClosure = loadables.getTransitiveClosure();
 
-        // the dependency map from test classes to their dependencies
+        // the dependency map from classes to their dependencies
         Map<String, Set<String>> reverseTransitiveClosure = getReverseClosure(transitiveClosure);
 
         Set<String> additionalTests = new HashSet<>();
@@ -262,15 +263,16 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
                     for (String sootNewAffectedClass: sootNewAffectedClasses) {
                         Set<String> fieldValues = sootNewAffectedClassesToFields.get(sootNewAffectedClass);
-                        for (String fieldValue : fieldValues) {
+                        for (String combinedfieldValue : fieldValues) {
+                            // System.out.println("combinedfieldValue: " + combinedfieldValue);
+                            String fieldValue = combinedfieldValue.substring(0, combinedfieldValue.indexOf("+"));
+                            int length = Integer.valueOf(combinedfieldValue.substring(combinedfieldValue.indexOf("+"))).intValue();
                             String key = sootNewAffectedClass + "." + fieldValue;
                             Set<String> values = new HashSet<>();
                             if (SootAnalysisFieldsToAffectedClassesSet.containsKey(key)) {
                                 values = SootAnalysisFieldsToAffectedClassesSet.get(key);
-                                values.add(testClass);
-                            } else {
-                                values.add(testClass);
                             }
+                            values.add(testClass + "+" + length);
                             SootAnalysisFieldsToAffectedClassesSet.put(key, values);
                         }
                     }
@@ -309,15 +311,15 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
                                 for (String reachableClassFromAdditionalAffectedTestClass: reachableClassesFromAdditionalAffectedTestClass) {
                                     Set<String> fieldValues = reachableClassesFromAdditionalAffectedTestClassToFields.get(reachableClassFromAdditionalAffectedTestClass);
-                                    for (String fieldValue : fieldValues) {
+                                    for (String combinedfieldValue : fieldValues) {
+                                        String fieldValue = combinedfieldValue.substring(0, combinedfieldValue.indexOf("+"));
+                                        int length = Integer.valueOf(combinedfieldValue.substring(combinedfieldValue.indexOf("+"))).intValue();
                                         String key = reachableClassFromAdditionalAffectedTestClass + "." + fieldValue;
                                         Set<String> values = new HashSet<>();
                                         if (SootAnalysisFieldsToAffectedClassesSet.containsKey(key)) {
                                             values = SootAnalysisFieldsToAffectedClassesSet.get(key);
-                                            values.add(additionalAffectedTestClass);
-                                        } else {
-                                            values.add(additionalAffectedTestClass);
                                         }
+                                        values.add(additionalAffectedTestClass + "+" + length);
                                         SootAnalysisFieldsToAffectedClassesSet.put(key, values);
                                     }
                                 }
@@ -361,23 +363,10 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
         // add class count for basic version ...
         getImmutableList();
-        int classCount = 0;
-        Map<String, Set<String>> normalTestClassToClassesSet = new HashMap<>();
-        Map<String, Boolean> classContainsStaticFieldsOrNot = new HashMap<>();
         for (String affectedTest : affectedTests) {
             Set<String> dependencies = transitiveClosure.get(affectedTest);
             for (String dependency : dependencies) {
                 if (processedClasses.contains(dependency)) {
-                    if (classContainsStaticFieldsOrNot.containsKey(dependency)) {
-                        if (classContainsStaticFieldsOrNot.get(dependency)) {
-                            Set<String> valuesString = new HashSet<>();
-                            if (normalTestClassToClassesSet.containsKey(affectedTest)) {
-                                valuesString = normalTestClassToClassesSet.get(affectedTest);
-                            }
-                            valuesString.add(dependency);
-                            normalTestClassToClassesSet.put(affectedTest, valuesString);
-                        }
-                    }
                     continue;
                 }
                 processedClasses.add(dependency);
@@ -393,14 +382,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
                             if (upperLevelAffectedTestClasses != null) {
                                 additionalTests.addAll(upperLevelAffectedTestClasses);
                             }
-                            Set<String> valuesString = new HashSet<>();
-                            if (normalTestClassToClassesSet.containsKey(affectedTest)) {
-                                valuesString = normalTestClassToClassesSet.get(affectedTest);
-                            }
-                            valuesString.add(dependency);
-                            normalTestClassToClassesSet.put(affectedTest, valuesString);
-                            classContainsStaticFieldsOrNot.put(dependency, true);
-                            classCount += 1;
                             break;
                         }
                     }
@@ -413,9 +394,69 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
 
-        record_classes_stats(classCount);
-        record_classes_deps(normalTestClassToClassesSet);
         affectedTests.addAll(additionalTests);
+
+        // update the classes-deps file according to the distance
+        Set<String> processedDependencies = new HashSet<>();
+        Map<String, Set<String>> startsFieldsToAffectedClassesSet = new HashMap<>();
+        Map<String, Boolean> classContainsStaticFieldsOrNot = new HashMap<>();
+        DirectedGraph<String> graph = loadables.getGraph();
+
+        for (String affectedTest : affectedTests) {
+            Set<String> dependencies = transitiveClosure.get(affectedTest);
+            for (String dependency : dependencies) {
+                if (processedDependencies.contains(dependency)) {
+                    continue;
+                }
+                processedDependencies.add(dependency);
+                try {
+                    Class clazz = loader.loadClass(dependency);
+                    boolean containsStaticField = false;
+                    for (Field field : clazz.getDeclaredFields()) {
+                        if (inImmutableList(field)) {
+                            continue;
+                        }
+                        if (Modifier.isStatic(field.getModifiers())) {
+                            containsStaticField = true;
+                            String upperLevelAffectedClass = clazz.getName();
+                            String fieldFullName = upperLevelAffectedClass + "." + field.getName();
+                            Set<String> valuesString = new HashSet<>();
+                            startsFieldsToAffectedClassesSet.put(fieldFullName, valuesString);
+                        }
+                    }
+                    if (containsStaticField) {
+                        classContainsStaticFieldsOrNot.put(dependency, true);
+                    }
+                } catch (ClassNotFoundException CNFE)  {
+                    // System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                } catch (NoClassDefFoundError NCDFE)  {
+                    // System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                }
+
+            }
+        }
+
+        for (String processedDependency : processedDependencies) {
+            if (classContainsStaticFieldsOrNot.containsKey(processedDependency)) {
+                Set<String> affectedTestClassesByDependency = reverseTransitiveClosure.get(processedDependency);
+                for (String affectedTestClassByDependency : affectedTestClassesByDependency) {
+                    Set<String> dest = new HashSet<>();
+                    dest.add(processedDependency);
+                    int length = GraphUtils.computeShortestPath(graph, affectedTestClassByDependency, dest).size();
+                    String valueString = affectedTestClassByDependency + "+" + length;
+                    for (String startsField: startsFieldsToAffectedClassesSet.keySet()) {
+                        if (startsField.startsWith(processedDependency)) {
+                            Set<String> valuesString = startsFieldsToAffectedClassesSet.get(startsField);
+                            valuesString.add(valueString);
+                            startsFieldsToAffectedClassesSet.put(startsField, valuesString);
+                        }
+                    }
+                }
+            }
+        }
+
+        record_classes_stats(processedDependencies.size());
+        record_classes_deps(startsFieldsToAffectedClassesSet);
 
         return affectedTests;
     }
@@ -680,10 +721,15 @@ public class IncDetectorPlugin extends DetectorPlugin {
             Writer.writeToFile(testClasses, "all-tests", artifactsDir);
             Writer.writeToFile(affectedTests, "selected-tests", artifactsDir);
         }
+        RTSUtil.saveForNextRun(artifactsDir, graph, printGraph, graphFile);
         if (globalLogLevel <= Level.FINEST.intValue()) {
             RTSUtil.saveForNextRun(artifactsDir, graph, printGraph, graphFile);
             Writer.writeClassPath(sfPathString, artifactsDir);
         }
+    }
+
+    public static void customizedPrintGraph(String artifactsDir, DirectedGraph<String> graph, boolean printGraph, String graphFile) {
+        RTSUtil.saveForNextRun(artifactsDir, graph, printGraph, graphFile);
     }
 
     public Loadables updateForNextRun(final ProjectWrapper project, Set<String> nonAffected) throws IOException, MojoExecutionException {
@@ -751,9 +797,20 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 .collect(Collectors.toList());
 
         for(Map.Entry<String, Set<String>> entry: list) {
-            String deps = entry.getKey() + ": ";
-            for (String dep: entry.getValue()) {
-                deps += dep + ";";
+            String deps = entry.getKey() + ",";
+            Set<String> values = entry.getValue();
+            Map<String, Integer> distanceMap = new HashMap<>();
+            for (String value : values) {
+                String distanceKey = value.substring(0, value.indexOf("+"));
+                int length = Integer.valueOf(value.substring(value.indexOf("+"))).intValue();
+                distanceMap.put(distanceKey, length);
+            }
+
+            List<Map.Entry<String, Integer>> distanceList = distanceMap.entrySet().stream()
+                    .sorted((entry1, entry2) -> (entry1.getValue()).compareTo(entry2.getValue()))
+                    .collect(Collectors.toList());
+            for (Map.Entry<String, Integer> dep: distanceList) {
+                deps += dep.getKey() + "+" + dep.getValue() + ",";
             }
             deps += " " + entry.getValue().size() + "\n";
             try {

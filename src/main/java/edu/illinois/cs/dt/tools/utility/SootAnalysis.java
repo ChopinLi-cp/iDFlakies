@@ -1,6 +1,10 @@
 package edu.illinois.cs.dt.tools.utility;
 
 import edu.illinois.cs.dt.tools.detection.IncDetectorPlugin;
+import edu.illinois.starts.helpers.RTSUtil;
+import edu.illinois.yasgl.DirectedGraph;
+import edu.illinois.yasgl.DirectedGraphBuilder;
+import edu.illinois.yasgl.GraphUtils;
 import soot.*;
 import soot.Hierarchy;
 import soot.jimple.*;
@@ -29,6 +33,7 @@ public class SootAnalysis {
     private static String methodName;
     private static LinkedList<String> excludeList;
     private static Set<String> immutableList;
+    private static DirectedGraph directedGraph;
 
 
     private static LinkedList<String> getExcludeList() {
@@ -50,6 +55,7 @@ public class SootAnalysis {
             excludeList.add("org.apache.*");
             excludeList.add("org.xml.*");
             excludeList.add("org.codehaus.*");
+            excludeList.add("org.junit.*");
         }
         return excludeList;
     }
@@ -148,7 +154,7 @@ public class SootAnalysis {
 
     }
 
-    private static boolean reportFieldRefInfo(Stmt stmt, final Map<String, Set<String>> affectedClassesToFields) {
+    private static boolean reportFieldRefInfo(Stmt stmt, final Map<String, Set<String>> affectedClassesToFields, SootMethod sm, SootClass sc) {
         final boolean[] reachStaticFields = {false};
         FieldRef fieldRef = stmt.getFieldRef();
         // System.out.println("FIELDREF: " + fieldRef);
@@ -174,18 +180,49 @@ public class SootAnalysis {
                 if ( v.getField().getDeclaringClass().isEnum()) {
                     return;
                 }
-//                if ((v.getField().getModifiers() & 0x00004000) != 0) {
-//                    return;
-//                }
 
-
+                String combinedFieldName = fieldName;
+                int minLength = Integer.MAX_VALUE;
+                for (SootMethod sootMethod : sc.getMethods()) {
+                    String srcMethod = sootMethod.getDeclaringClass().getName() + "." +sootMethod.getName();
+                    String tgtMethod = sm.getDeclaringClass().getName() + "." + sm.getName();
+                    Set<String> tgtMethods = new HashSet<>();
+                    tgtMethods.add(tgtMethod);
+                    // System.out.println("EDGE: " + srcMethod + " -> " + tgtMethods);
+                    try {
+                        if (srcMethod == tgtMethod) {
+                            minLength = 0;
+                            continue;
+                        }
+                        if (GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size() != 0) {
+                            int length = GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size();
+                            if (length < minLength) {
+                                minLength = length;
+                            }
+                        }
+                    } catch (Exception exception) {
+                        exception.printStackTrace();
+                    }
+                }
                 Set<String> fieldNames = new HashSet<>();
                 if (!affectedClassesToFields.containsKey(className)) {
-                    fieldNames.add(fieldName);
+                    combinedFieldName = fieldName + "+" + minLength;
+                    fieldNames.add(combinedFieldName);
                 } else {
                     fieldNames = affectedClassesToFields.get(className);
-                    fieldNames.add(fieldName);
+                    for (String fieldNamesKey : fieldNames) {
+                        if (fieldNamesKey.startsWith(fieldName + "+")) {
+                            int originaLength = Integer.valueOf(fieldNamesKey.substring(fieldNamesKey.indexOf("+"))).intValue();
+                            if (minLength < originaLength) {
+                                combinedFieldName = fieldName + "+" + minLength;
+                                fieldNames.remove(fieldNamesKey);
+                                fieldNames.add(combinedFieldName);
+                            }
+                            break;
+                        }
+                    }
                 }
+                // System.out.println(fieldNames.toString());
                 affectedClassesToFields.put(className, fieldNames);
                 reachStaticFields[0] = true;
                 // affectedClasses.add(v.getField().getName());
@@ -219,7 +256,7 @@ public class SootAnalysis {
         return hasAnnotation;
     }
 
-    public static boolean detectAffectedClasses(CallGraph callGraph, List<SootMethod> tmpEntryPoints, Map<String, Set<String>> affectedClassesToFields) {
+    public static boolean detectAffectedClasses(CallGraph callGraph, SootClass sc, List<SootMethod> tmpEntryPoints, Map<String, Set<String>> affectedClassesToFields) {
         boolean flag = false;
 
         ReachableMethods rm = new ReachableMethods(callGraph, tmpEntryPoints);
@@ -244,7 +281,7 @@ public class SootAnalysis {
                 for (Unit u : reachableMethodBody.getUnits()) {
                     Stmt stmt = (Stmt) u;
                     if (stmt.containsFieldRef()) {
-                        boolean reachStaticFields = reportFieldRefInfo(stmt, affectedClassesToFields);
+                        boolean reachStaticFields = reportFieldRefInfo(stmt, affectedClassesToFields, reachableMethod, sc);
                         if (reachStaticFields) {
                             flag = true;
                         }
@@ -345,11 +382,33 @@ public class SootAnalysis {
 
         // Call graph
         CallGraph callGraph = Scene.v().getCallGraph();
+        DirectedGraphBuilder directedGraphBuilder = new DirectedGraphBuilder();
+
+        QueueReader queueReader = callGraph.listener();
+//        Iterator<MethodOrMethodContext> qr = callGraph.sourceMethods();
+//        for(Iterator<SootMethod> it = qr; it.hasNext(); )
+        // System.out.println("SIZE: " + callGraph.size());
+        for(QueueReader<Edge> it = queueReader; it.hasNext(); ) {
+            Edge edge = it.next();
+            String srcClass = edge.getSrc().method().getDeclaringClass().getName();
+            String tgtClass = edge.getTgt().method().getDeclaringClass().getName();
+            if (SootUtil.inLibrary(srcClass) || inExcludeList(srcClass) || SootUtil.inLibrary(tgtClass) || inExcludeList(tgtClass)) {
+                continue;
+            }
+
+            String srcMethod = srcClass + "." + edge.getSrc().method().getName();
+            String tgtMethod = tgtClass + "." + edge.getTgt().method().getName();
+            // System.out.println(srcMethod + " " + tgtMethod);
+            directedGraphBuilder.addEdge(srcMethod, tgtMethod);
+        }
+        directedGraph = directedGraphBuilder.build();
+        IncDetectorPlugin.customizedPrintGraph(PathManager.cachePath().toString(), directedGraph, true, "soot-graph");
+
         if (!fineGranularity) {
-            detectAffectedClasses(callGraph, entryPoints, affectedClassesToFields);
+            detectAffectedClasses(callGraph, sc, entryPoints, affectedClassesToFields);
             return affectedClassesToFields;
         }
-        detectAffectedClasses(callGraph, tmpEntryPoints, affectedClassesToFields);
+        detectAffectedClasses(callGraph, sc, tmpEntryPoints, affectedClassesToFields);
 
         if (!affectedClassesToFields.keySet().isEmpty()) {
             selectedTests.addAll(testClassToMethod.get(clzName));
@@ -364,7 +423,7 @@ public class SootAnalysis {
                 } catch (Exception e) {
                     // e.printStackTrace();
                 }
-                boolean reachStaticFields = detectAffectedClasses(callGraph, tmpEntryPoints, affectedClassesToFields);
+                boolean reachStaticFields = detectAffectedClasses(callGraph, sc, tmpEntryPoints, affectedClassesToFields);
                 // tmpEntryPoints.remove(sm);
                 if (reachStaticFields) {
                     // System.out.println("CLASSTOTEST2: " + clzName + "; " + test );
@@ -375,6 +434,5 @@ public class SootAnalysis {
 
         return affectedClassesToFields;
     }
-
 }
 
