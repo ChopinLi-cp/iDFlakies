@@ -195,8 +195,11 @@ public class SootAnalysis {
                             minLength = 0;
                             continue;
                         }
-                        if (GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size() != 0) {
-                            int length = GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size();
+                        if (GraphUtils.computeAnyPath(directedGraph, srcMethod, tgtMethods).size() == 0) {
+                            continue;
+                        }
+                        int length = GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size();
+                        if (length != 0) {
                             if (length < minLength) {
                                 minLength = length;
                             }
