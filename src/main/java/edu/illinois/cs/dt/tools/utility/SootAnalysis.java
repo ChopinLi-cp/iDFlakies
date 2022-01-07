@@ -398,6 +398,9 @@ public class SootAnalysis {
 
             String srcMethod = srcClass + "." + edge.getSrc().method().getName();
             String tgtMethod = tgtClass + "." + edge.getTgt().method().getName();
+            if (srcMethod == tgtMethod) {
+                continue;
+            }
             // System.out.println(srcMethod + " " + tgtMethod);
             directedGraphBuilder.addEdge(srcMethod, tgtMethod);
         }
