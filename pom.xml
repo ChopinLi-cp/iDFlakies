@@ -72,12 +72,6 @@
         </dependency>
 
         <dependency>
-            <groupId>edu.illinois.cs</groupId>
-            <artifactId>testrunner-maven-plugin</artifactId>
-            <version>1.2</version>
-        </dependency>
-
-        <dependency>
             <groupId>com.opencsv</groupId>
             <artifactId>opencsv</artifactId>
             <version>4.3</version>

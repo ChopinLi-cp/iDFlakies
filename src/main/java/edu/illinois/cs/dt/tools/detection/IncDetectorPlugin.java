@@ -6,7 +6,6 @@ import edu.illinois.cs.dt.tools.utility.SootAnalysis;
 import edu.illinois.cs.testrunner.configuration.Configuration;
 import edu.illinois.cs.testrunner.data.framework.TestFramework;
 import edu.illinois.cs.testrunner.util.ProjectWrapper;
-import edu.illinois.cs.testrunner.mavenplugin.MavenProjectWrapper;
 import edu.illinois.starts.data.ZLCFormat;
 import edu.illinois.starts.enums.DependencyFormat;
 import edu.illinois.starts.helpers.*;
@@ -578,12 +577,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
     public Classpath getSureFireClassPath(final ProjectWrapper project) {
         long start = System.currentTimeMillis();
         if (sureFireClassPath == null) {
-            if (project instanceof MavenProjectWrapper) {
-                sureFireClassPath = new Classpath(project.getTestClasspathElements());
-            } else {
-                sureFireClassPath = new Classpath(project.getClasspathElements()); // contains not just getTestClasspathElements()
-                // sureFireClassPath = new Classpath(getProject().getTestClasspathElements()); // AbstractSurefireMojo
-            }
+            sureFireClassPath = new Classpath(project.getClasspathElements()); // contains not just getTestClasspathElements()
+            // sureFireClassPath = new Classpath(getProject().getTestClasspathElements()); // AbstractSurefireMojo
         }
         Logger.getGlobal().log(Level.FINEST, "SF-CLASSPATH: " + sureFireClassPath.getClassPath());
         long end = System.currentTimeMillis();
