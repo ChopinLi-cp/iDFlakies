@@ -13,6 +13,9 @@ import soot.jimple.toolkits.callgraph.Edge;
 import soot.jimple.toolkits.callgraph.ReachableMethods;
 import soot.jimple.spark.ondemand.pautil.SootUtil;
 
+import soot.jimple.toolkits.infoflow.CallChain;
+import soot.jimple.toolkits.infoflow.InfoFlowAnalysis;
+import soot.jimple.toolkits.infoflow.LocalObjectsAnalysis;
 import soot.options.Options;
 import soot.tagkit.AnnotationTag;
 import soot.tagkit.VisibilityAnnotationTag;
@@ -33,7 +36,8 @@ public class SootAnalysis {
     private static String methodName;
     private static LinkedList<String> excludeList;
     private static Set<String> immutableList;
-    private static DirectedGraph directedGraph;
+    // private static DirectedGraph directedGraph;
+    // private static DirectedGraphBuilder directedGraphBuilder = new DirectedGraphBuilder();
 
 
     private static LinkedList<String> getExcludeList() {
@@ -155,7 +159,7 @@ public class SootAnalysis {
 
     }
 
-    private static boolean reportFieldRefInfo(Stmt stmt, final Map<String, Set<String>> affectedClassesToFields, SootMethod sm, SootClass sc) {
+    private static boolean reportFieldRefInfo(Stmt stmt, final Map<String, Set<String>> affectedClassesToFields, SootMethod sm, SootClass sc, DirectedGraph directedGraph) {
         final boolean[] reachStaticFields = {false};
         FieldRef fieldRef = stmt.getFieldRef();
         // System.out.println("FIELDREF: " + fieldRef);
@@ -189,21 +193,39 @@ public class SootAnalysis {
                     String tgtMethod = sm.getDeclaringClass().getName() + "." + sm.getName();
                     Set<String> tgtMethods = new HashSet<>();
                     tgtMethods.add(tgtMethod);
+                    // InfoFlowAnalysis infoFlowAnalysis = new InfoFlowAnalysis(true, true);
+                    // LocalObjectsAnalysis localObjectsAnalysis = new LocalObjectsAnalysis(infoFlowAnalysis);
                     // System.out.println("EDGE: " + srcMethod + " -> " + tgtMethods);
                     try {
                         if (srcMethod == tgtMethod) {
                             minLength = 0;
                             continue;
                         }
-                        if (GraphUtils.computeAnyPath(directedGraph, srcMethod, tgtMethods).size() == 0) {
-                            continue;
+                        int length = Integer.MAX_VALUE;
+                        // List<CallChain> previouslyFound = new LinkedList<>();
+                        // System.out.println("Scene.v().getCallGraph().size(): " + Scene.v().getCallGraph().size());
+                        // System.out.println("EDGE0: " + srcMethod + " -> " + tgtMethod);
+                        // CallChain callChain = localObjectsAnalysis.getNextCallChainBetween(sootMethod, sm, previouslyFound);
+                        // while (callChain != null) {
+                        //     previouslyFound.add(callChain);
+                        //     length = callChain.size() < length ? callChain.size():length;
+                            // System.out.println("EDGE0In: " + srcMethod + " -> " + tgtMethod + " " + length);
+                        //     callChain = localObjectsAnalysis.getNextCallChainBetween(sootMethod, sm, previouslyFound);
+                        // }
+                        // if (GraphUtils.computeAnyPath(directedGraph, srcMethod, tgtMethods).size() == 0) {
+                        //     continue;
+                        // }
+                        try {
+                            length = GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size();
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
-                        int length = GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size();
                         if (length != 0) {
-                            if (length < minLength) {
-                                minLength = length;
-                            }
+                            minLength = length < minLength ? length:minLength;
                         }
+                        // if (minLength == Integer.MAX_VALUE) {
+                        //     System.out.println("EDGE: " + srcMethod + " -> " + tgtMethod);
+                        // }
                     } catch (Exception exception) {
                         exception.printStackTrace();
                     }
@@ -225,6 +247,11 @@ public class SootAnalysis {
                             break;
                         }
                     }
+                }
+                // System.out.println("EDGE: " + sc.getName() + " -> " + sm.getDeclaringClass() + "." +sm.getName() + " " + minLength);
+                if (minLength == Integer.MAX_VALUE) {
+                    // System.out.println("EDGE: " + sc.getName() + " -> " + sm.getDeclaringClass() + "." +sm.getName());
+                    return;
                 }
                 // System.out.println(fieldNames.toString());
                 affectedClassesToFields.put(className, fieldNames);
@@ -260,7 +287,7 @@ public class SootAnalysis {
         return hasAnnotation;
     }
 
-    public static boolean detectAffectedClasses(CallGraph callGraph, SootClass sc, List<SootMethod> tmpEntryPoints, Map<String, Set<String>> affectedClassesToFields) {
+    public static boolean detectAffectedClasses(CallGraph callGraph, SootClass sc, List<SootMethod> tmpEntryPoints, Map<String, Set<String>> affectedClassesToFields, DirectedGraph directedGraph) {
         boolean flag = false;
 
         ReachableMethods rm = new ReachableMethods(callGraph, tmpEntryPoints);
@@ -285,7 +312,7 @@ public class SootAnalysis {
                 for (Unit u : reachableMethodBody.getUnits()) {
                     Stmt stmt = (Stmt) u;
                     if (stmt.containsFieldRef()) {
-                        boolean reachStaticFields = reportFieldRefInfo(stmt, affectedClassesToFields, reachableMethod, sc);
+                        boolean reachStaticFields = reportFieldRefInfo(stmt, affectedClassesToFields, reachableMethod, sc, directedGraph);
                         if (reachStaticFields) {
                             flag = true;
                         }
@@ -386,36 +413,48 @@ public class SootAnalysis {
 
         // Call graph
         CallGraph callGraph = Scene.v().getCallGraph();
-        DirectedGraphBuilder directedGraphBuilder = new DirectedGraphBuilder();
 
         QueueReader queueReader = callGraph.listener();
 //        Iterator<MethodOrMethodContext> qr = callGraph.sourceMethods();
 //        for(Iterator<SootMethod> it = qr; it.hasNext(); )
         // System.out.println("SIZE: " + callGraph.size());
+        DirectedGraphBuilder directedGraphBuilder = new DirectedGraphBuilder();
+        List<Edge> edgeSet = new LinkedList<>();
         for(QueueReader<Edge> it = queueReader; it.hasNext(); ) {
             Edge edge = it.next();
             String srcClass = edge.getSrc().method().getDeclaringClass().getName();
             String tgtClass = edge.getTgt().method().getDeclaringClass().getName();
-            if (SootUtil.inLibrary(srcClass) || inExcludeList(srcClass) || SootUtil.inLibrary(tgtClass) || inExcludeList(tgtClass)) {
+            if (SootUtil.inLibrary(srcClass) || inExcludeList(srcClass) || edge.getSrc().method().isJavaLibraryMethod() ||
+                    SootUtil.inLibrary(tgtClass) || inExcludeList(tgtClass) || edge.getTgt().method().isJavaLibraryMethod()) {
+                edgeSet.add(edge);
                 continue;
             }
 
             String srcMethod = srcClass + "." + edge.getSrc().method().getName();
             String tgtMethod = tgtClass + "." + edge.getTgt().method().getName();
             if (srcMethod == tgtMethod) {
+                edgeSet.add(edge);
                 continue;
             }
             // System.out.println(srcMethod + " " + tgtMethod);
             directedGraphBuilder.addEdge(srcMethod, tgtMethod);
         }
-        directedGraph = directedGraphBuilder.build();
+//        System.out.println("BEFORE SIZE: " + callGraph.size());
+//        System.out.println("REMOVE SIZE: " + edgeSet.size());
+//        for (Edge edgeItem : edgeSet) {
+//            callGraph.removeEdge(edgeItem, false);
+//        }
+
+//        System.out.println("SIZE: " + callGraph.size());
+        DirectedGraph directedGraph = directedGraphBuilder.build();
+//        System.out.println("directedGraph SIZE: " + directedGraph.getEdges().size());
         IncDetectorPlugin.customizedPrintGraph(PathManager.cachePath().toString(), directedGraph, true, "soot-graph");
 
         if (!fineGranularity) {
-            detectAffectedClasses(callGraph, sc, entryPoints, affectedClassesToFields);
+            detectAffectedClasses(callGraph, sc, entryPoints, affectedClassesToFields, directedGraph);
             return affectedClassesToFields;
         }
-        detectAffectedClasses(callGraph, sc, tmpEntryPoints, affectedClassesToFields);
+        detectAffectedClasses(callGraph, sc, tmpEntryPoints, affectedClassesToFields, directedGraph);
 
         if (!affectedClassesToFields.keySet().isEmpty()) {
             selectedTests.addAll(testClassToMethod.get(clzName));
@@ -430,7 +469,7 @@ public class SootAnalysis {
                 } catch (Exception e) {
                     // e.printStackTrace();
                 }
-                boolean reachStaticFields = detectAffectedClasses(callGraph, sc, tmpEntryPoints, affectedClassesToFields);
+                boolean reachStaticFields = detectAffectedClasses(callGraph, sc, tmpEntryPoints, affectedClassesToFields, directedGraph);
                 // tmpEntryPoints.remove(sm);
                 if (reachStaticFields) {
                     // System.out.println("CLASSTOTEST2: " + clzName + "; " + test );
