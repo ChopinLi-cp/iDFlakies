@@ -577,7 +577,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
     public Classpath getSureFireClassPath(final ProjectWrapper project) {
         long start = System.currentTimeMillis();
         if (sureFireClassPath == null) {
-            sureFireClassPath = new Classpath(project.getClasspathElements()); // contains not just getTestClasspathElements()
+            sureFireClassPath = new Classpath(project.getTestClasspathElements()); // contains not just getTestClasspathElements()
             // sureFireClassPath = new Classpath(getProject().getTestClasspathElements()); // AbstractSurefireMojo
         }
         Logger.getGlobal().log(Level.FINEST, "SF-CLASSPATH: " + sureFireClassPath.getClassPath());
