@@ -13,6 +13,8 @@ import edu.illinois.starts.maven.AgentLoader;
 import edu.illinois.starts.util.Logger;
 import edu.illinois.starts.util.Pair;
 import edu.illinois.yasgl.DirectedGraph;
+import edu.illinois.yasgl.DirectedGraphBuilder;
+import edu.illinois.yasgl.Edge;
 import edu.illinois.yasgl.GraphUtils;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -227,6 +229,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> affectedClasses = new HashSet<>();
 
         if (selectBasedOnMethodsCall) {
+            DirectedGraphBuilder directedGraphBuilder = new DirectedGraphBuilder();
+            DirectedGraph directedGraph = directedGraphBuilder.build();
             // this.affectedTestClasses = affectedTests;
             Map<String, List<String>> testClassToMethod = new HashMap<>();
             List<String> currentTests = super.getTests(project, this.runner.framework());
@@ -255,11 +259,19 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 if(affectedTests.contains(testClass)) {
                     Set<String> sootNewAffectedClasses = new HashSet<>();
                     Map<String, Set<String>> sootNewAffectedClassesToFields = new HashMap<>();
+                    DirectedGraphBuilder directedGraphBuilderItem = new DirectedGraphBuilder();
                     // Combine these two methods to one method ...
                     // analysis(String cpString, String testClass, Map<> testClassToMethod) {
                     //    return analysisOnMethods(cpString, testClass, testClassToMethod, new ArrayList<>());
-                    sootNewAffectedClassesToFields = SootAnalysis.analysis(cpString, testClass, testClassToMethod, fineGranularity, this.selectedTests);
+                    sootNewAffectedClassesToFields = SootAnalysis.analysis(cpString, testClass, testClassToMethod, fineGranularity, this.selectedTests, directedGraphBuilderItem);
                     sootNewAffectedClasses = sootNewAffectedClassesToFields.keySet();
+
+                    DirectedGraph directedGraphItem = directedGraphBuilderItem.build();
+                    Collection<Edge> edgeSet = directedGraphItem.getEdges();
+                    
+                    for (Edge edge: edgeSet) {
+                        directedGraphBuilder.addEdge(edge.getSource(), edge.getDestination());
+                    }
 
                     for (String sootNewAffectedClass: sootNewAffectedClasses) {
                         Set<String> fieldValues = sootNewAffectedClassesToFields.get(sootNewAffectedClass);
@@ -301,13 +313,21 @@ public class IncDetectorPlugin extends DetectorPlugin {
                         if(selectBasedOnMethodsCallUpgrade) {
                             Set<String> reachableClassesFromAdditionalAffectedTestClass = new HashSet<>();
                             Map<String, Set<String>> reachableClassesFromAdditionalAffectedTestClassToFields = new HashMap<>();
+                            DirectedGraphBuilder directedGraphBuilderItem = new DirectedGraphBuilder();
+
                             if(SootAnalysisTestClassesToClassesSet.containsKey(additionalAffectedTestClass)) {
                                 reachableClassesFromAdditionalAffectedTestClass = SootAnalysisTestClassesToClassesSet.get(additionalAffectedTestClass);
                             }
                             else {
                                 // System.out.println("additionalAffectedTestClass: " + additionalAffectedTestClass);
-                                reachableClassesFromAdditionalAffectedTestClassToFields = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod, fineGranularity, this.selectedTests);
+                                reachableClassesFromAdditionalAffectedTestClassToFields = SootAnalysis.analysis(cpString, additionalAffectedTestClass, testClassToMethod, fineGranularity, this.selectedTests, directedGraphBuilderItem);
                                 reachableClassesFromAdditionalAffectedTestClass = reachableClassesFromAdditionalAffectedTestClassToFields.keySet();
+
+                                DirectedGraph directedGraphItem = directedGraphBuilderItem.build();
+                                Collection<Edge> edgeSet = directedGraphItem.getEdges();
+                                for (Edge edge: edgeSet) {
+                                    directedGraphBuilder.addEdge(edge.getSource(), edge.getDestination());
+                                }
 
                                 for (String reachableClassFromAdditionalAffectedTestClass: reachableClassesFromAdditionalAffectedTestClass) {
                                     Set<String> fieldValues = reachableClassesFromAdditionalAffectedTestClassToFields.get(reachableClassFromAdditionalAffectedTestClass);
@@ -356,6 +376,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
             affectedTests.addAll(additionalTests);
 
             record_classes_stats(filteredClassesCount);
+
+            directedGraph = directedGraphBuilder.build();
+            customizedPrintGraph(getArtifactsDir(), directedGraph, true, "soot-graph");
 
             record_classes_deps(SootAnalysisFieldsToAffectedClassesSet);
             return affectedTests;

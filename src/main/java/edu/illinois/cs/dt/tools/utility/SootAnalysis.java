@@ -197,11 +197,11 @@ public class SootAnalysis {
                     // LocalObjectsAnalysis localObjectsAnalysis = new LocalObjectsAnalysis(infoFlowAnalysis);
                     // System.out.println("EDGE: " + srcMethod + " -> " + tgtMethods);
                     try {
-                        if (srcMethod == tgtMethod) {
+                        if (srcMethod.equals(tgtMethod)) {
                             minLength = 0;
                             continue;
                         }
-                        int length = Integer.MAX_VALUE;
+                        // int length = Integer.MAX_VALUE;
                         // List<CallChain> previouslyFound = new LinkedList<>();
                         // System.out.println("Scene.v().getCallGraph().size(): " + Scene.v().getCallGraph().size());
                         // System.out.println("EDGE0: " + srcMethod + " -> " + tgtMethod);
@@ -215,14 +215,17 @@ public class SootAnalysis {
                         // if (GraphUtils.computeAnyPath(directedGraph, srcMethod, tgtMethods).size() == 0) {
                         //     continue;
                         // }
-                        try {
+
+                        // temporarily comment the length calculation to make to run
+                        /* try {
                             length = GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size();
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
                         if (length != 0) {
                             minLength = length < minLength ? length:minLength;
-                        }
+                        } */
+
                         // if (minLength == Integer.MAX_VALUE) {
                         //     System.out.println("EDGE: " + srcMethod + " -> " + tgtMethod);
                         // }
@@ -249,10 +252,10 @@ public class SootAnalysis {
                     }
                 }
                 // System.out.println("EDGE: " + sc.getName() + " -> " + sm.getDeclaringClass() + "." +sm.getName() + " " + minLength);
-                if (minLength == Integer.MAX_VALUE) {
+                /* if (minLength == Integer.MAX_VALUE) {
                     // System.out.println("EDGE: " + sc.getName() + " -> " + sm.getDeclaringClass() + "." +sm.getName());
                     return;
-                }
+                } */
                 // System.out.println(fieldNames.toString());
                 affectedClassesToFields.put(className, fieldNames);
                 reachStaticFields[0] = true;
@@ -355,7 +358,7 @@ public class SootAnalysis {
         }
     }
 
-    public static Map<String, Set<String>> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod, boolean fineGranularity, List<String> selectedTests) {
+    public static Map<String, Set<String>> analysis(String srcDir, String clsName, Map<String, List<String>> testClassToMethod, boolean fineGranularity, List<String> selectedTests, final DirectedGraphBuilder directedGraphBuilder) {
         // Set<String> affectedClasses = new HashSet<>();
         Map<String, Set<String>> affectedClassesToFields = new HashMap<>();
 
@@ -418,7 +421,7 @@ public class SootAnalysis {
 //        Iterator<MethodOrMethodContext> qr = callGraph.sourceMethods();
 //        for(Iterator<SootMethod> it = qr; it.hasNext(); )
         // System.out.println("SIZE: " + callGraph.size());
-        DirectedGraphBuilder directedGraphBuilder = new DirectedGraphBuilder();
+        // DirectedGraphBuilder directedGraphBuilder = new DirectedGraphBuilder();
         List<Edge> edgeSet = new LinkedList<>();
         for(QueueReader<Edge> it = queueReader; it.hasNext(); ) {
             Edge edge = it.next();
@@ -448,7 +451,7 @@ public class SootAnalysis {
 //        System.out.println("SIZE: " + callGraph.size());
         DirectedGraph directedGraph = directedGraphBuilder.build();
 //        System.out.println("directedGraph SIZE: " + directedGraph.getEdges().size());
-        IncDetectorPlugin.customizedPrintGraph(PathManager.cachePath().toString(), directedGraph, true, "soot-graph");
+        // IncDetectorPlugin.customizedPrintGraph(PathManager.cachePath().toString(), directedGraph, true, "soot-graph");
 
         if (!fineGranularity) {
             detectAffectedClasses(callGraph, sc, entryPoints, affectedClassesToFields, directedGraph);
