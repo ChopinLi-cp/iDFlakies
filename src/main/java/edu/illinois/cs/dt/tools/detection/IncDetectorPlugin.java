@@ -129,6 +129,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     protected boolean detectOrNot;
 
+    protected int distance;
+
     private Set<String> affectedTestClasses;
 
     protected List<String> selectedTests;
@@ -204,16 +206,20 @@ public class IncDetectorPlugin extends DetectorPlugin {
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
         if ( selectAll || affectedTests.size() == allTests.size() ) {
-            if (!removeBasedOnMethodsCall) {
+            /* if (!removeBasedOnMethodsCall) {
                 return allTests;
             }
             else {
                 affectedTests = allTests;
-            }
+            } */
+            affectedTests = allTests;
         }
 
         if (!selectMore || loadables == null) {
-            return affectedTests;
+            // deal with cases like wildfly whose loadables is null and we could not deal with it more
+            String sfPathString = Writer.pathToString(sureFireClassPath.getClassPath());
+            loadables = prepareForNextRun(sfPathString, sureFireClassPath, (List<String>) allTests, new HashSet<>(), true);
+            // return affectedTests;
         }
 
 
@@ -268,7 +274,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
                     DirectedGraph directedGraphItem = directedGraphBuilderItem.build();
                     Collection<Edge> edgeSet = directedGraphItem.getEdges();
-                    
+
                     for (Edge edge: edgeSet) {
                         directedGraphBuilder.addEdge(edge.getSource(), edge.getDestination());
                     }
@@ -417,7 +423,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
 
-        affectedTests.addAll(additionalTests);
+        Set<String> tmpAffectedTests = affectedTests;
+        tmpAffectedTests.addAll(additionalTests);
 
         // update the classes-deps file according to the distance
         Set<String> processedDependencies = new HashSet<>();
@@ -425,7 +432,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Map<String, Boolean> classContainsStaticFieldsOrNot = new HashMap<>();
         DirectedGraph<String> graph = loadables.getGraph();
 
-        for (String affectedTest : affectedTests) {
+        for (String affectedTest : tmpAffectedTests) {
             Set<String> dependencies = transitiveClosure.get(affectedTest);
             for (String dependency : dependencies) {
                 if (processedDependencies.contains(dependency)) {
@@ -459,6 +466,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
 
+        Set<String> finalAdditionalTests = new HashSet<>();
+        System.out.println("DISTANCE: " + distance);
+
         for (String processedDependency : processedDependencies) {
             if (classContainsStaticFieldsOrNot.containsKey(processedDependency)) {
                 Set<String> affectedTestClassesByDependency = reverseTransitiveClosure.get(processedDependency);
@@ -466,21 +476,42 @@ public class IncDetectorPlugin extends DetectorPlugin {
                     Set<String> dest = new HashSet<>();
                     dest.add(processedDependency);
                     int length = GraphUtils.computeShortestPath(graph, affectedTestClassByDependency, dest).size();
-                    String valueString = affectedTestClassByDependency + "+" + length;
-                    for (String startsField: startsFieldsToAffectedClassesSet.keySet()) {
-                        if (startsField.startsWith(processedDependency)) {
-                            Set<String> valuesString = startsFieldsToAffectedClassesSet.get(startsField);
-                            valuesString.add(valueString);
-                            startsFieldsToAffectedClassesSet.put(startsField, valuesString);
+                    if (length <= distance) {
+                        finalAdditionalTests.add(affectedTestClassByDependency);
+                        String valueString = affectedTestClassByDependency + "+" + length;
+                        for (String startsField: startsFieldsToAffectedClassesSet.keySet()) {
+                            if (startsField.startsWith(processedDependency)) {
+                                Set<String> valuesString = startsFieldsToAffectedClassesSet.get(startsField);
+                                valuesString.add(valueString);
+                                startsFieldsToAffectedClassesSet.put(startsField, valuesString);
+                            }
                         }
                     }
                 }
             }
         }
 
+
+
         record_classes_stats(processedDependencies.size());
         record_classes_deps(startsFieldsToAffectedClassesSet);
 
+        for (String startsField : startsFieldsToAffectedClassesSet.keySet()) {
+            Set<String> valueString = startsFieldsToAffectedClassesSet.get(startsField);
+            if (valueString.size() <= 1) {
+                continue;
+            } else {
+                for (String value : valueString) {
+                    String finalAdditionalTest = value.substring(0, value.indexOf("+"));
+                    int length = Integer.valueOf(value.substring(value.indexOf("+"))).intValue();
+                    if (length <= distance) {
+                        finalAdditionalTests.add(finalAdditionalTest);
+                    }
+                }
+            }
+        }
+        additionalTests.retainAll(finalAdditionalTests);
+        affectedTests.addAll(additionalTests);
         return affectedTests;
     }
 
@@ -536,6 +567,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         removeBasedOnMethodsCall = Configuration.config().getProperty("dt.incdetector.removeonmethods", false);
         detectOrNot = Configuration.config().getProperty("dt.incdetector.detectornot", true);
         fineGranularity = Configuration.config().getProperty("dt.incdetector.finegranularity", false);
+        distance = Configuration.config().getProperty("dt.incdetector.distance", Integer.MAX_VALUE);
 
         getSureFireClassPath(project);
         loader = createClassLoader(sureFireClassPath);
