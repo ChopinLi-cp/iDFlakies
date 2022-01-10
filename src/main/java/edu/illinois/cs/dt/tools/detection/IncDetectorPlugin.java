@@ -174,6 +174,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
         // setIncludesExcludes();
         Set<String> allTests = new HashSet<>(getTestClasses(project, this.runner.framework()));
+        List<String> allTestsForLoadables = new LinkedList<>();
+        allTests.addAll(allTests);
         Set<String> affectedTests = new HashSet<>(allTests);
 
         // System.out.println("SAME?: " + isSameClassPath(sfPathElements) + " " + hasSameJarChecksum(sfPathElements));
@@ -215,10 +217,18 @@ public class IncDetectorPlugin extends DetectorPlugin {
             affectedTests = allTests;
         }
 
-        if (!selectMore || loadables == null) {
+        if (!selectMore) {
+            return affectedTests;
+        }
+        if (loadables == null) {
             // deal with cases like wildfly whose loadables is null and we could not deal with it more
-            String sfPathString = Writer.pathToString(sureFireClassPath.getClassPath());
-            loadables = prepareForNextRun(sfPathString, sureFireClassPath, (List<String>) allTests, new HashSet<>(), true);
+            try {
+                String sfPathString = Writer.pathToString(sureFireClassPath.getClassPath());
+                loadables = prepareForNextRun(sfPathString, sureFireClassPath, allTestsForLoadables, new HashSet<>(), true);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return affectedTests;
+            }
             // return affectedTests;
         }
 
