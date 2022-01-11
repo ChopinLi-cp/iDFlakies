@@ -402,13 +402,19 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
         // add class count for basic version ...
         getImmutableList();
+        DirectedGraph<String> graph = loadables.getGraph();
         for (String affectedTest : affectedTests) {
             Set<String> dependencies = transitiveClosure.get(affectedTest);
             for (String dependency : dependencies) {
                 if (processedClasses.contains(dependency)) {
                     continue;
                 }
-                processedClasses.add(dependency);
+                Set<String> dest = new HashSet<>();
+                dest.add(dependency);
+                int length = GraphUtils.computeShortestPath(graph, affectedTest, dest).size();
+                if (length > distance) {
+                    continue;
+                }
                 try {
                     Class clazz = loader.loadClass(dependency);
                     for (Field field : clazz.getDeclaredFields()) {
@@ -417,13 +423,21 @@ public class IncDetectorPlugin extends DetectorPlugin {
                         }
                         if (Modifier.isStatic(field.getModifiers())) {
                             String upperLevelAffectedClass = clazz.getName();
+                            Set<String> upperLevelAffectedClassDest = new HashSet<>();
+                            upperLevelAffectedClassDest.add(upperLevelAffectedClass);
                             Set<String> upperLevelAffectedTestClasses = reverseTransitiveClosure.get(upperLevelAffectedClass);
                             if (upperLevelAffectedTestClasses != null) {
-                                additionalTests.addAll(upperLevelAffectedTestClasses);
+                                for (String upperLevelAffectedTestClass: upperLevelAffectedTestClasses) {
+                                    int reverseLength = GraphUtils.computeShortestPath(graph, upperLevelAffectedTestClass, upperLevelAffectedClassDest).size();
+                                    if (reverseLength <= distance) {
+                                        additionalTests.add(upperLevelAffectedTestClass);
+                                    }
+                                }
                             }
                             break;
                         }
                     }
+                    processedClasses.add(dependency);
                 } catch (ClassNotFoundException CNFE)  {
                     // System.out.println("Can not load class. Test dependency skipping: " + dependency);
                 } catch (NoClassDefFoundError NCDFE)  {
@@ -440,7 +454,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> processedDependencies = new HashSet<>();
         Map<String, Set<String>> startsFieldsToAffectedClassesSet = new HashMap<>();
         Map<String, Boolean> classContainsStaticFieldsOrNot = new HashMap<>();
-        DirectedGraph<String> graph = loadables.getGraph();
 
         for (String affectedTest : tmpAffectedTests) {
             Set<String> dependencies = transitiveClosure.get(affectedTest);
@@ -476,7 +489,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
 
-        Set<String> finalAdditionalTests = new HashSet<>();
+        // Set<String> finalAdditionalTests = new HashSet<>();
         System.out.println("DISTANCE: " + distance);
 
         for (String processedDependency : processedDependencies) {
@@ -487,7 +500,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                     dest.add(processedDependency);
                     int length = GraphUtils.computeShortestPath(graph, affectedTestClassByDependency, dest).size();
                     if (length <= distance) {
-                        finalAdditionalTests.add(affectedTestClassByDependency);
+                        // finalAdditionalTests.add(affectedTestClassByDependency);
                         String valueString = affectedTestClassByDependency + "+" + length;
                         for (String startsField: startsFieldsToAffectedClassesSet.keySet()) {
                             if (startsField.startsWith(processedDependency)) {
@@ -502,11 +515,13 @@ public class IncDetectorPlugin extends DetectorPlugin {
         }
 
 
+        if(detectOrNot) {
+            record_classes_stats(processedDependencies.size());
+            record_classes_deps(startsFieldsToAffectedClassesSet);
+            customizedPrintGraph(getArtifactsDir(), graph, true, "starts-graph");
+        }
 
-        record_classes_stats(processedDependencies.size());
-        record_classes_deps(startsFieldsToAffectedClassesSet);
-
-        for (String startsField : startsFieldsToAffectedClassesSet.keySet()) {
+        /* for (String startsField : startsFieldsToAffectedClassesSet.keySet()) {
             Set<String> valueString = startsFieldsToAffectedClassesSet.get(startsField);
             if (valueString.size() <= 1) {
                 continue;
@@ -519,8 +534,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
                     }
                 }
             }
-        }
-        additionalTests.retainAll(finalAdditionalTests);
+        } */
+        // additionalTests.retainAll(finalAdditionalTests);
         affectedTests.addAll(additionalTests);
         return affectedTests;
     }
@@ -786,7 +801,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
             Writer.writeToFile(testClasses, "all-tests", artifactsDir);
             Writer.writeToFile(affectedTests, "selected-tests", artifactsDir);
         }
-        RTSUtil.saveForNextRun(artifactsDir, graph, printGraph, graphFile);
         if (globalLogLevel <= Level.FINEST.intValue()) {
             RTSUtil.saveForNextRun(artifactsDir, graph, printGraph, graphFile);
             Writer.writeClassPath(sfPathString, artifactsDir);
