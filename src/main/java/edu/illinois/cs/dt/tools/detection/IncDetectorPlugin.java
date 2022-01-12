@@ -489,7 +489,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
 
-        // Set<String> finalAdditionalTests = new HashSet<>();
+        Set<String> finalAffectedTests = new HashSet<>();
         System.out.println("DISTANCE: " + distance);
 
         for (String processedDependency : processedDependencies) {
@@ -500,7 +500,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                     dest.add(processedDependency);
                     int length = GraphUtils.computeShortestPath(graph, affectedTestClassByDependency, dest).size();
                     if (length <= distance) {
-                        // finalAdditionalTests.add(affectedTestClassByDependency);
+                        finalAffectedTests.add(affectedTestClassByDependency);
                         String valueString = affectedTestClassByDependency + "+" + length;
                         for (String startsField: startsFieldsToAffectedClassesSet.keySet()) {
                             if (startsField.startsWith(processedDependency)) {
@@ -536,8 +536,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         } */
         // additionalTests.retainAll(finalAdditionalTests);
-        affectedTests.addAll(additionalTests);
-        return affectedTests;
+        /* affectedTests.addAll(additionalTests);
+        return affectedTests; */
+        return finalAffectedTests;
     }
 
     protected Pair<Set<String>, Set<String>> computeChangeData(boolean writeChanged) throws FileNotFoundException {
