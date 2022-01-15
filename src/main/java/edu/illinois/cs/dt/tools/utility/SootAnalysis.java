@@ -201,7 +201,7 @@ public class SootAnalysis {
                             minLength = 0;
                             continue;
                         }
-                        // int length = Integer.MAX_VALUE;
+                        int length = Integer.MAX_VALUE;
                         // List<CallChain> previouslyFound = new LinkedList<>();
                         // System.out.println("Scene.v().getCallGraph().size(): " + Scene.v().getCallGraph().size());
                         // System.out.println("EDGE0: " + srcMethod + " -> " + tgtMethod);
@@ -217,13 +217,16 @@ public class SootAnalysis {
                         // }
 
                         // temporarily comment the length calculation to make to run
-                        /* try {
-                            length = GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size();
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                        if (length != 0) {
-                            minLength = length < minLength ? length:minLength;
+                        /* if (fieldName.equals("com.openpojo.log.LoggerFactory.loggerConstructor")) {
+                            try {
+                                length = GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size();
+                                System.out.println("EDGE: " + srcMethod + " -> " + tgtMethod + ": " + length);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                            if (length != 0) {
+                                minLength = length < minLength ? length : minLength;
+                            }
                         } */
 
                         // if (minLength == Integer.MAX_VALUE) {

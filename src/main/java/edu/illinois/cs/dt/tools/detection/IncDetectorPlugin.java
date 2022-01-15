@@ -391,12 +391,14 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
             affectedTests.addAll(additionalTests);
 
-            record_classes_stats(filteredClassesCount);
+            if (detectOrNot) {
+                record_classes_stats(filteredClassesCount);
 
-            directedGraph = directedGraphBuilder.build();
-            customizedPrintGraph(getArtifactsDir(), directedGraph, true, "soot-graph");
+                directedGraph = directedGraphBuilder.build();
+                customizedPrintGraph(getArtifactsDir(), directedGraph, true, "soot-graph");
 
-            record_classes_deps(SootAnalysisFieldsToAffectedClassesSet);
+                record_classes_deps(SootAnalysisFieldsToAffectedClassesSet);
+            }
             return affectedTests;
         }
 
@@ -447,11 +449,11 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         }
 
-        Set<String> tmpAffectedTests = affectedTests;
-        tmpAffectedTests.addAll(additionalTests);
+        // Set<String> tmpAffectedTests = affectedTests;
+        // tmpAffectedTests.addAll(additionalTests);
 
         // update the classes-deps file according to the distance
-        Set<String> processedDependencies = new HashSet<>();
+        /* Set<String> processedDependencies = new HashSet<>();
         Map<String, Set<String>> startsFieldsToAffectedClassesSet = new HashMap<>();
         Map<String, Boolean> classContainsStaticFieldsOrNot = new HashMap<>();
 
@@ -487,10 +489,10 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 }
 
             }
-        }
+        } */
 
-        Set<String> finalAffectedTests = new HashSet<>();
-        System.out.println("DISTANCE: " + distance);
+        /* Set<String> finalAffectedTests = new HashSet<>();
+        // System.out.println("DISTANCE: " + distance);
 
         for (String processedDependency : processedDependencies) {
             if (classContainsStaticFieldsOrNot.containsKey(processedDependency)) {
@@ -500,7 +502,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
                     dest.add(processedDependency);
                     int length = GraphUtils.computeShortestPath(graph, affectedTestClassByDependency, dest).size();
                     if (length <= distance) {
-                        finalAffectedTests.add(affectedTestClassByDependency);
+                        if (affectedTests.contains(affectedTestClassByDependency)) {
+                            finalAffectedTests.add(affectedTestClassByDependency);
+                        }
                         String valueString = affectedTestClassByDependency + "+" + length;
                         for (String startsField: startsFieldsToAffectedClassesSet.keySet()) {
                             if (startsField.startsWith(processedDependency)) {
@@ -512,14 +516,14 @@ public class IncDetectorPlugin extends DetectorPlugin {
                     }
                 }
             }
-        }
+        } */
 
 
-        if(detectOrNot) {
+        /* if(detectOrNot) {
             record_classes_stats(processedDependencies.size());
             record_classes_deps(startsFieldsToAffectedClassesSet);
             customizedPrintGraph(getArtifactsDir(), graph, true, "starts-graph");
-        }
+        } */
 
         /* for (String startsField : startsFieldsToAffectedClassesSet.keySet()) {
             Set<String> valueString = startsFieldsToAffectedClassesSet.get(startsField);
@@ -536,9 +540,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
             }
         } */
         // additionalTests.retainAll(finalAdditionalTests);
-        /* affectedTests.addAll(additionalTests);
-        return affectedTests; */
-        return finalAffectedTests;
+        affectedTests.addAll(additionalTests);
+        return affectedTests;
     }
 
     protected Pair<Set<String>, Set<String>> computeChangeData(boolean writeChanged) throws FileNotFoundException {
