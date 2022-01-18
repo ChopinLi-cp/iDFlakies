@@ -188,6 +188,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> affectedTests = new HashSet<>(allTests);
 
         // System.out.println("SAME?: " + isSameClassPath(sfPathElements) + " " + hasSameJarChecksum(sfPathElements));
+        // System.out.println(sfPathElements);
         boolean selectAll = false;
         if (!isSameClassPath(sfPathElements) || !hasSameJarChecksum(sfPathElements)) {
             // Force retestAll because classpath changed since last run
@@ -197,6 +198,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             nonAffectedTests = new HashSet<>();
             Writer.writeClassPath(cpString, artifactsDir);
             Writer.writeJarChecksums(sfPathElements, artifactsDir, jarCheckSums);
+            // System.out.println("SELECTALL");
             selectAll = true;
         }
 
@@ -217,6 +219,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
         if ( selectAll || affectedTests.size() == allTests.size() ) {
+            // System.out.println("SELECTALL");
             /* if (!removeBasedOnMethodsCall) {
                 return allTests;
             }
@@ -791,14 +794,19 @@ public class IncDetectorPlugin extends DetectorPlugin {
     private List<String> getCleanClassPath(String cp) {
         List<String> cpPaths = new ArrayList<>();
         String[] paths = cp.split(File.pathSeparator);
-        String classes = File.separator + TARGET +  File.separator + CLASSES;
+        String classes = File.separator + TARGET + File.separator + CLASSES;
         String testClasses = File.separator + TARGET + File.separator + TEST_CLASSES;
+        Set<String> classPathSet = new HashSet<>();
         for (int i = 0; i < paths.length; i++) {
+            paths[i].replaceAll(" ", "");
             // TODO: should we also exclude SNAPSHOTS from same project?
             if (paths[i].contains(classes) || paths[i].contains(testClasses)) {
                 continue;
             }
-            cpPaths.add(paths[i]);
+            classPathSet.add(paths[i]);
+        }
+        for(String classPath: classPathSet) {
+            cpPaths.add(classPath);
         }
         return cpPaths;
     }
@@ -924,6 +932,13 @@ public class IncDetectorPlugin extends DetectorPlugin {
             List<String> oldClassPathelements = getCleanClassPath(oldClassPathLines.get(0));
             // comparing lists and not sets in case order changes
             if (sfPathString.equals(oldClassPathelements)) {
+                return true;
+            }
+            Set<String> sfPathStringSet = new HashSet<>();
+            sfPathStringSet.addAll(sfPathString);
+            Set<String> oldClassPathelementsSet = new HashSet<>();
+            oldClassPathelementsSet.addAll(sfPathString);
+            if (sfPathStringSet.equals(oldClassPathelementsSet)) {
                 return true;
             }
         } catch (IOException ioe) {
