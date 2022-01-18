@@ -557,16 +557,12 @@ public class IncDetectorPlugin extends DetectorPlugin {
     }
 
     private Set<String> computeEkstaziAffectedTests(ProjectWrapper project) throws IOException, MojoExecutionException, ClassNotFoundException {
-        /* String cpString = Writer.pathToString(sureFireClassPath.getClassPath());
+        String cpString = Writer.pathToString(sureFireClassPath.getClassPath());
         List<String> sfPathElements = getCleanClassPath(cpString);
 
-        // setIncludesExcludes();
         Set<String> allTests = new HashSet<>(getTestClasses(project, this.runner.framework()));
-        List<String> allTestsForLoadables = new LinkedList<>();
-        allTests.addAll(allTests);
-        Set<String> affectedTests = new HashSet<>(allTests);
+        Set<String> affectedTests = new HashSet<>();
 
-        // System.out.println("SAME?: " + isSameClassPath(sfPathElements) + " " + hasSameJarChecksum(sfPathElements));
         boolean selectAll = false;
         if (!isSameClassPath(sfPathElements) || !hasSameJarChecksum(sfPathElements)) {
             // Force retestAll because classpath changed since last run
@@ -578,6 +574,20 @@ public class IncDetectorPlugin extends DetectorPlugin {
             Writer.writeJarChecksums(sfPathElements, artifactsDir, jarCheckSums);
             selectAll = true;
         }
+
+        if (selectAll) {
+            // affectedTests = allTests;
+            return allTests;
+        }
+
+        // setIncludesExcludes();
+        /*
+        List<String> allTestsForLoadables = new LinkedList<>();
+        allTests.addAll(allTests);
+        Set<String> affectedTests = new HashSet<>(allTests);
+
+        // System.out.println("SAME?: " + isSameClassPath(sfPathElements) + " " + hasSameJarChecksum(sfPathElements));
+
 
         nonAffectedTests = new HashSet<>();
         Pair<Set<String>, Set<String>> data = computeChangeData(false);
@@ -595,11 +605,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Loadables loadables = updateForNextRun(project, nonAffectedTests);
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
-        if ( selectAll || affectedTests.size() == allTests.size() ) {
-            affectedTests = allTests;
-        } */
+         */
 
-        Set<String> affectedTests = new HashSet<>();
+
 
         try {
             // System.out.println("ekstaziSelectedTestsFile: " + ekstaziSelectedTestsFile);
