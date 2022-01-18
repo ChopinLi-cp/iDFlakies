@@ -9,6 +9,7 @@ import edu.illinois.cs.testrunner.util.ProjectWrapper;
 import edu.illinois.starts.data.ZLCFormat;
 import edu.illinois.starts.enums.DependencyFormat;
 import edu.illinois.starts.helpers.*;
+import edu.illinois.starts.helpers.Writer;
 import edu.illinois.starts.maven.AgentLoader;
 import edu.illinois.starts.util.Logger;
 import edu.illinois.starts.util.Pair;
@@ -22,9 +23,7 @@ import org.apache.maven.surefire.booter.Classpath;
 import org.apache.maven.surefire.booter.SurefireExecutionException;
 import soot.SootMethod;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
@@ -131,6 +130,12 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     protected int distance;
 
+    protected String ekstaziSelectedTestsFile;
+
+    protected String ekstaziDependenciesFile;
+
+    protected boolean ekstaziOrNot;
+
     private Set<String> affectedTestClasses;
 
     protected List<String> selectedTests;
@@ -169,6 +174,10 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
     // from SelectMojo
     private Set<String> computeAffectedTests(ProjectWrapper project) throws IOException, MojoExecutionException, ClassNotFoundException {
+        if (ekstaziOrNot) {
+            return computeEkstaziAffectedTests(project);
+        }
+
         String cpString = Writer.pathToString(sureFireClassPath.getClassPath());
         List<String> sfPathElements = getCleanClassPath(cpString);
 
@@ -544,6 +553,152 @@ public class IncDetectorPlugin extends DetectorPlugin {
         return affectedTests;
     }
 
+    private Set<String> computeEkstaziAffectedTests(ProjectWrapper project) throws IOException, MojoExecutionException, ClassNotFoundException {
+        /* String cpString = Writer.pathToString(sureFireClassPath.getClassPath());
+        List<String> sfPathElements = getCleanClassPath(cpString);
+
+        // setIncludesExcludes();
+        Set<String> allTests = new HashSet<>(getTestClasses(project, this.runner.framework()));
+        List<String> allTestsForLoadables = new LinkedList<>();
+        allTests.addAll(allTests);
+        Set<String> affectedTests = new HashSet<>(allTests);
+
+        // System.out.println("SAME?: " + isSameClassPath(sfPathElements) + " " + hasSameJarChecksum(sfPathElements));
+        boolean selectAll = false;
+        if (!isSameClassPath(sfPathElements) || !hasSameJarChecksum(sfPathElements)) {
+            // Force retestAll because classpath changed since last run
+            // don't compute changed and non-affected classes
+            dynamicallyUpdateExcludes(new ArrayList<String>());
+            // Make nonAffected empty so dependencies can be updated
+            nonAffectedTests = new HashSet<>();
+            Writer.writeClassPath(cpString, artifactsDir);
+            Writer.writeJarChecksums(sfPathElements, artifactsDir, jarCheckSums);
+            selectAll = true;
+        }
+
+        nonAffectedTests = new HashSet<>();
+        Pair<Set<String>, Set<String>> data = computeChangeData(false);
+        // System.out.println("CHANGEDATA: " + data);
+        nonAffectedTests = data == null ? new HashSet<String>() : data.getKey();
+        // System.out.println("NONAFFECTEDTESTS: " + nonAffectedTests.size() + " " + nonAffectedTests);
+        List<String> excludePaths = Writer.fqnsToExcludePath(nonAffectedTests);
+        dynamicallyUpdateExcludes(excludePaths);
+        affectedTests.removeAll(nonAffectedTests);
+        if (allTests.equals(nonAffectedTests)) {
+            Logger.getGlobal().log(Level.INFO, STARS_RUN_STARS);
+            Logger.getGlobal().log(Level.INFO, NO_TESTS_ARE_SELECTED_TO_RUN);
+        }
+        long startUpdate = System.currentTimeMillis();
+        Loadables loadables = updateForNextRun(project, nonAffectedTests);
+        long endUpdate = System.currentTimeMillis();
+        Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate));
+        if ( selectAll || affectedTests.size() == allTests.size() ) {
+            affectedTests = allTests;
+        } */
+
+        Set<String> affectedTests = new HashSet<>();
+
+        try {
+            System.out.println("ekstaziSelectedTestsFile: " + ekstaziSelectedTestsFile);
+            BufferedReader in = new BufferedReader(new FileReader(ekstaziSelectedTestsFile));
+            String str;
+            while ((str = in.readLine()) != null) {
+                affectedTests.add(str);
+            }
+        } catch (IOException e) {
+        }
+
+
+        if (!selectMore) {
+            return affectedTests;
+        }
+
+
+        Map<String, Set<String>> transitiveClosure = new HashMap<>();
+        DirectedGraphBuilder graphBuilder = new DirectedGraphBuilder();
+
+
+        try {
+            BufferedReader in = new BufferedReader(new FileReader(ekstaziDependenciesFile));
+            String str;
+            while ((str = in.readLine()) != null) {
+                String transitiveClosureKey = str.substring(0, str.indexOf(","));
+                String transitiveClosureValues = str.substring(str.indexOf(","));
+                String[] transitiveClosureValueArray = transitiveClosureValues.split(",");
+                Set<String> transitiveClosureValue = new HashSet<>();
+                for (String transitiveClosureValueArrayItem: transitiveClosureValueArray) {
+                    transitiveClosureValue.add(transitiveClosureValueArrayItem);
+                    graphBuilder.addEdge(transitiveClosureKey, transitiveClosureValueArrayItem);
+                }
+                transitiveClosure.put(transitiveClosureKey, transitiveClosureValue);
+            }
+        } catch (IOException e) {
+        }
+
+        // the dependency map from classes to their dependencies
+        Map<String, Set<String>> reverseTransitiveClosure = getReverseClosure(transitiveClosure);
+
+        Set<String> additionalTests = new HashSet<>();
+
+        // iter through the affected tests and find what depends on
+        Set<String> processedClasses = new HashSet<>();
+        Set<String> affectedClasses = new HashSet<>();
+
+        // add class count for basic version ...
+        DirectedGraph<String> graph = graphBuilder.build();
+        getImmutableList();
+        for (String affectedTest : affectedTests) {
+            Set<String> dependencies = transitiveClosure.get(affectedTest);
+            if (dependencies == null) {
+                continue;
+            }
+            for (String dependency : dependencies) {
+                if (processedClasses.contains(dependency)) {
+                    continue;
+                }
+                Set<String> dest = new HashSet<>();
+                dest.add(dependency);
+                int length = GraphUtils.computeShortestPath(graph, affectedTest, dest).size();
+                if (length > distance) {
+                    continue;
+                }
+                try {
+                    Class clazz = loader.loadClass(dependency);
+                    for (Field field : clazz.getDeclaredFields()) {
+                        if (inImmutableList(field)) {
+                            continue;
+                        }
+                        if (Modifier.isStatic(field.getModifiers())) {
+                            String upperLevelAffectedClass = clazz.getName();
+                            Set<String> upperLevelAffectedClassDest = new HashSet<>();
+                            upperLevelAffectedClassDest.add(upperLevelAffectedClass);
+                            Set<String> upperLevelAffectedTestClasses = reverseTransitiveClosure.get(upperLevelAffectedClass);
+                            if (upperLevelAffectedTestClasses != null) {
+                                for (String upperLevelAffectedTestClass: upperLevelAffectedTestClasses) {
+                                    int reverseLength = GraphUtils.computeShortestPath(graph, upperLevelAffectedTestClass, upperLevelAffectedClassDest).size();
+                                    if (reverseLength <= distance) {
+                                        additionalTests.add(upperLevelAffectedTestClass);
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    processedClasses.add(dependency);
+                } catch (ClassNotFoundException CNFE)  {
+                    // System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                } catch (NoClassDefFoundError NCDFE)  {
+                    // System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                }
+
+            }
+        }
+
+        affectedTests.addAll(additionalTests);
+        return affectedTests;
+    }
+
+
     protected Pair<Set<String>, Set<String>> computeChangeData(boolean writeChanged) throws FileNotFoundException {
         long start = System.currentTimeMillis();
         Pair<Set<String>, Set<String>> data = null;
@@ -597,6 +752,9 @@ public class IncDetectorPlugin extends DetectorPlugin {
         detectOrNot = Configuration.config().getProperty("dt.incdetector.detectornot", true);
         fineGranularity = Configuration.config().getProperty("dt.incdetector.finegranularity", false);
         distance = Configuration.config().getProperty("dt.incdetector.distance", Integer.MAX_VALUE);
+        ekstaziOrNot = Configuration.config().getProperty("dt.incdetector.ekstazi", false);
+        ekstaziSelectedTestsFile = Configuration.config().getProperty("dt.incdetector.ekstaziselectedtests", "");
+        ekstaziDependenciesFile = Configuration.config().getProperty("dt.incdetector.ekstazidependencies", "");;
 
         getSureFireClassPath(project);
         loader = createClassLoader(sureFireClassPath);

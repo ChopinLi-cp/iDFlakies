@@ -217,7 +217,7 @@ public class SootAnalysis {
                         // }
 
                         // temporarily comment the length calculation to make to run
-                        /* if (fieldName.equals("com.openpojo.log.LoggerFactory.loggerConstructor")) {
+                        if (fieldName.equals("com.openpojo.log.LoggerFactory.loggerConstructor")) {
                             try {
                                 length = GraphUtils.computeShortestPath(directedGraph, srcMethod, tgtMethods).size();
                                 System.out.println("EDGE: " + srcMethod + " -> " + tgtMethod + ": " + length);
@@ -227,7 +227,7 @@ public class SootAnalysis {
                             if (length != 0) {
                                 minLength = length < minLength ? length : minLength;
                             }
-                        } */
+                        }
 
                         // if (minLength == Integer.MAX_VALUE) {
                         //     System.out.println("EDGE: " + srcMethod + " -> " + tgtMethod);
