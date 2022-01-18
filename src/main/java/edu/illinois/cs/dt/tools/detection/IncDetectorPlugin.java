@@ -599,7 +599,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> affectedTests = new HashSet<>();
 
         try {
-            System.out.println("ekstaziSelectedTestsFile: " + ekstaziSelectedTestsFile);
+            // System.out.println("ekstaziSelectedTestsFile: " + ekstaziSelectedTestsFile);
             BufferedReader in = new BufferedReader(new FileReader(ekstaziSelectedTestsFile));
             String str;
             while ((str = in.readLine()) != null) {
@@ -622,17 +622,23 @@ public class IncDetectorPlugin extends DetectorPlugin {
             BufferedReader in = new BufferedReader(new FileReader(ekstaziDependenciesFile));
             String str;
             while ((str = in.readLine()) != null) {
+                if (!str.contains(",")) {
+                    continue;
+                }
                 String transitiveClosureKey = str.substring(0, str.indexOf(","));
                 String transitiveClosureValues = str.substring(str.indexOf(","));
+                // System.out.println(transitiveClosureKey + ": " + transitiveClosureValues);
                 String[] transitiveClosureValueArray = transitiveClosureValues.split(",");
                 Set<String> transitiveClosureValue = new HashSet<>();
                 for (String transitiveClosureValueArrayItem: transitiveClosureValueArray) {
                     transitiveClosureValue.add(transitiveClosureValueArrayItem);
+                    // System.out.println("EDGE: " + transitiveClosureKey + "->" + transitiveClosureValueArrayItem);
                     graphBuilder.addEdge(transitiveClosureKey, transitiveClosureValueArrayItem);
                 }
                 transitiveClosure.put(transitiveClosureKey, transitiveClosureValue);
             }
         } catch (IOException e) {
+            e.printStackTrace();
         }
 
         // the dependency map from classes to their dependencies
