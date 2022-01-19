@@ -626,7 +626,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
 
         Map<String, Set<String>> transitiveClosure = new HashMap<>();
-        DirectedGraphBuilder graphBuilder = new DirectedGraphBuilder();
+        // DirectedGraphBuilder graphBuilder = new DirectedGraphBuilder();
 
 
         try {
@@ -644,7 +644,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 for (String transitiveClosureValueArrayItem: transitiveClosureValueArray) {
                     transitiveClosureValue.add(transitiveClosureValueArrayItem);
                     // System.out.println("EDGE: " + transitiveClosureKey + "->" + transitiveClosureValueArrayItem);
-                    graphBuilder.addEdge(transitiveClosureKey, transitiveClosureValueArrayItem);
+                    // graphBuilder.addEdge(transitiveClosureKey, transitiveClosureValueArrayItem);
                 }
                 transitiveClosure.put(transitiveClosureKey, transitiveClosureValue);
             }
@@ -662,7 +662,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Set<String> affectedClasses = new HashSet<>();
 
         // add class count for basic version ...
-        DirectedGraph<String> graph = graphBuilder.build();
+        // DirectedGraph<String> graph = graphBuilder.build();
         getImmutableList();
         for (String affectedTest : affectedTests) {
             Set<String> dependencies = transitiveClosure.get(affectedTest);
@@ -675,10 +675,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
                 }
                 Set<String> dest = new HashSet<>();
                 dest.add(dependency);
-                int length = GraphUtils.computeShortestPath(graph, affectedTest, dest).size();
-                if (length > distance) {
-                    continue;
-                }
                 try {
                     Class clazz = loader.loadClass(dependency);
                     for (Field field : clazz.getDeclaredFields()) {
@@ -692,10 +688,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
                             Set<String> upperLevelAffectedTestClasses = reverseTransitiveClosure.get(upperLevelAffectedClass);
                             if (upperLevelAffectedTestClasses != null) {
                                 for (String upperLevelAffectedTestClass: upperLevelAffectedTestClasses) {
-                                    int reverseLength = GraphUtils.computeShortestPath(graph, upperLevelAffectedTestClass, upperLevelAffectedClassDest).size();
-                                    if (reverseLength <= distance) {
-                                        additionalTests.add(upperLevelAffectedTestClass);
-                                    }
+                                    additionalTests.add(upperLevelAffectedTestClass);
                                 }
                             }
                             break;
