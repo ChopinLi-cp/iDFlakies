@@ -181,8 +181,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
             return computeEkstaziAffectedTests(project);
         }
 
-        String cpString = Writer.pathToString(sureFireClassPath.getClassPath());
-        List<String> sfPathElements = getCleanClassPath(cpString);
+        /* String cpString = Writer.pathToString(sureFireClassPath.getClassPath());
+        List<String> sfPathElements = getCleanClassPath(cpString); */
 
         // setIncludesExcludes();
         Set<String> allTests = new HashSet<>(getTestClasses(project, this.runner.framework()));
@@ -190,7 +190,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         /* List<String> allTestsForLoadables = new LinkedList<>();
         Set<String> affectedTests = new HashSet<>(allTests); */
 
-        boolean selectAll = false;
+        /* boolean selectAll = false;
         if (!isSameClassPath(sfPathElements) || !hasSameJarChecksum(sfPathElements)) {
             // Force retestAll because classpath changed since last run
             // don't compute changed and non-affected classes
@@ -198,7 +198,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
             Writer.writeJarChecksums(sfPathElements, artifactsDir, jarCheckSums);
             // System.out.println("SELECTALL");
             selectAll = true;
-        }
+        } */
 
         /* Pair<Set<String>, Set<String>> data = computeChangeData(false);
         // System.out.println("CHANGEDATA: " + data);
@@ -215,7 +215,7 @@ public class IncDetectorPlugin extends DetectorPlugin {
         Loadables loadables = updateForNextRun(project, nonAffectedTests);
         long endUpdate = System.currentTimeMillis();
         Logger.getGlobal().log(Level.FINE, PROFILE_STARTS_MOJO_UPDATE_TIME + Writer.millsToSeconds(endUpdate - startUpdate)); */
-        if (selectAll) {
+        // if (selectAll) {
             // System.out.println("SELECTALL");
             /* if (!removeBasedOnMethodsCall) {
                 return allTests;
@@ -223,8 +223,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
             else {
                 affectedTests = allTests;
             } */
-            return allTests;
-        }
+        //     return allTests;
+        // }
 
         if (!detectOrNot) {
             return affectedTests;
