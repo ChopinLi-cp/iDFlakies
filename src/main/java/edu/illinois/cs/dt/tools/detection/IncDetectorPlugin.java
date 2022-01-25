@@ -647,11 +647,6 @@ public class IncDetectorPlugin extends DetectorPlugin {
             selectAll = true;
         }
 
-        if (selectAll) {
-            // affectedTests = allTests;
-            return allTests;
-        }
-
         // setIncludesExcludes();
         /*
         List<String> allTestsForLoadables = new LinkedList<>();
@@ -694,6 +689,11 @@ public class IncDetectorPlugin extends DetectorPlugin {
 
         if (!selectMore) {
             return affectedTests;
+        }
+
+        if (selectAll) {
+            // affectedTests = allTests;
+            return allTests;
         }
 
 
