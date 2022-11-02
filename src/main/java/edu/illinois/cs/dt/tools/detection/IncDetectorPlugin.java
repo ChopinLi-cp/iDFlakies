@@ -155,7 +155,8 @@ public class IncDetectorPlugin extends DetectorPlugin {
         this.coordinates = logger.coordinates();
 
         long startTime = System.currentTimeMillis();
-        try {
+        System.setProperty("start-time", startTime + "");
+	try {
             affectedTestClasses = computeAffectedTests(project);
             if (!detectOrNot) {
                 System.out.println("Not detect flaky tests at the first run");
@@ -614,12 +615,13 @@ public class IncDetectorPlugin extends DetectorPlugin {
                             break;
                         }
                     }
-                    processedClasses.add(dependency);
+                    // processedClasses.add(dependency);
                 } catch (ClassNotFoundException CNFE)  {
-                    // System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                    System.out.println("Can not load class. Test dependency skipping: " + dependency);
                 } catch (NoClassDefFoundError NCDFE)  {
-                    // System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                    System.out.println("Can not load class. Test dependency skipping: " + dependency);
                 }
+		processedClasses.add(dependency);
 
             }
         }
@@ -763,12 +765,13 @@ public class IncDetectorPlugin extends DetectorPlugin {
                             break;
                         }
                     }
-                    processedClasses.add(dependency);
+		    // processedClasses.add(dependency);
                 } catch (ClassNotFoundException CNFE)  {
-                    // System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                    System.out.println("Can not load class. Test dependency skipping: " + dependency);
                 } catch (NoClassDefFoundError NCDFE)  {
-                    // System.out.println("Can not load class. Test dependency skipping: " + dependency);
+                    System.out.println("Can not load class. Test dependency skipping: " + dependency);
                 }
+		processedClasses.add(dependency);
 
             }
         }

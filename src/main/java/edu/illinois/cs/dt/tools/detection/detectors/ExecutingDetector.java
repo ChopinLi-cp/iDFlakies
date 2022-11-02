@@ -18,6 +18,7 @@ import edu.illinois.cs.testrunner.configuration.Configuration;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -109,12 +110,42 @@ public abstract class ExecutingDetector implements Detector, VerbosePrinter {
 
         @Override
         public boolean hasNext() {
+            final double mainTimeout = Configuration.config().getProperty("dt.timeout", 6 * 3600.0); // 6 hours
             while (i < rounds && result.isEmpty()) {
-                generate();
+	         double sumElapsed = (System.currentTimeMillis() - Double.parseDouble(System.getProperty("start-time"))) / 1000.0;
+		 double totalElapsed = (System.currentTimeMillis() - origStartTimeMs) / 1000.0;
+		 double elapsed = 0.0; 
+		 if (i > 0) elapsed = totalElapsed / i ; 
+		 System.out.println("TIMEOUT: " + mainTimeout + "; NOW: " + sumElapsed + "; ELASPSED: " + elapsed);
+		 if (sumElapsed >= mainTimeout) {
+	             recordNumOfRounds(i);
+	             return false;
+		 } else if (mainTimeout - sumElapsed < elapsed) {
+	             recordNumOfRounds(i);
+		     return false;
+		 }
+		 generate();
             }
-
+	    recordNumOfRounds(i);
             return !result.isEmpty();
         }
+
+	public void recordNumOfRounds(int i) {
+            if(!Files.exists(DetectorPathManager.numOfRoundsPath())) {
+                try {
+                    Files.createFile(DetectorPathManager.numOfRoundsPath());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+	    String stats = i + ",";
+	    try {
+                Files.write(DetectorPathManager.numOfRoundsPath(), stats.getBytes(),
+                        StandardOpenOption.APPEND);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+	}
 
         private DetectionRound generateDetectionRound() {
             final Path path = DetectorPathManager.detectionRoundPath(name, absoluteRound.get());

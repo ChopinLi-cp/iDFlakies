@@ -11,6 +11,7 @@ public class DetectorPathManager extends PathManager {
     public static final Path ORIGINAL_ORDER = Paths.get("original-order");
     public static final Path SELECTED_TESTS = Paths.get("selected-tests");
     public static final Path TIME = Paths.get("time");
+    public static final Path NUM_OF_ROUNDS = Paths.get("num-of-rounds");
     public static final Path CLASSES_STATS = Paths.get("classes-stats");
     public static final Path CLASSES_DEPS = Paths.get("classes-deps");
     public static final Path ERROR = Paths.get("error");
@@ -49,6 +50,8 @@ public class DetectorPathManager extends PathManager {
     public static Path selectedTestPath() { return path(SELECTED_TESTS); }
 
     public static Path timePath() { return path(TIME); }
+
+    public static Path numOfRoundsPath() { return path(NUM_OF_ROUNDS); }
 
     public static Path classesStatsPath() { return path(CLASSES_STATS); }
 
